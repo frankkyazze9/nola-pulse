@@ -88,7 +88,7 @@ export default function Home() {
           government accessible.
         </p>
         <p className="mt-4 text-sm text-muted">
-          Built by Frank Kyazze — for the people who actually live here.
+          For the people who actually live here.
         </p>
       </div>
 

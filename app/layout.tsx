@@ -33,11 +33,7 @@ export default function RootLayout({
         <Nav />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-card-border px-6 py-8 text-center text-sm text-muted">
-          <p>
-            NOLA Pulse — Built by{" "}
-            <span className="text-foreground">Frank Kyazze</span> for New
-            Orleans
-          </p>
+          <p>NOLA Pulse — Civic Intelligence for New Orleans</p>
         </footer>
       </body>
     </html>
