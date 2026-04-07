@@ -1,6 +1,7 @@
 import { StatsBar } from "@/components/admin/StatsBar";
 import { AgentStatusGrid } from "@/components/admin/AgentStatusGrid";
 import { ContentQueue } from "@/components/admin/ContentQueue";
+import { AiChat } from "@/components/admin/AiChat";
 import Link from "next/link";
 
 export default function AdminPage() {
@@ -39,9 +40,15 @@ export default function AdminPage() {
         <StatsBar />
       </div>
 
-      <div className="mb-8">
-        <h2 className="mb-4 text-xl font-semibold">Agent Status</h2>
-        <AgentStatusGrid />
+      <div className="mb-8 grid gap-8 lg:grid-cols-2">
+        <div>
+          <h2 className="mb-4 text-xl font-semibold">Agent Status</h2>
+          <AgentStatusGrid />
+        </div>
+        <div>
+          <h2 className="mb-4 text-xl font-semibold">AI Assistant</h2>
+          <AiChat />
+        </div>
       </div>
 
       <div>
