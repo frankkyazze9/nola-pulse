@@ -150,10 +150,16 @@ export function ContentQueue() {
                   )}
                   {item.status === "approved" && (
                     <button
-                      onClick={() => updateStatus(item.id, "published")}
+                      onClick={async () => {
+                        await fetch("/api/admin/publish", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ contentId: item.id }),
+                        });
+                      }}
                       className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-background"
                     >
-                      Publish
+                      Publish to Site
                     </button>
                   )}
                 </div>

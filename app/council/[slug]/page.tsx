@@ -1,3 +1,8 @@
+import { prisma } from "@/lib/db";
+import { notFound } from "next/navigation";
+
+export const dynamic = "force-dynamic";
+
 export default async function CouncilMeetingPage({
   params,
 }: {
@@ -5,13 +10,30 @@ export default async function CouncilMeetingPage({
 }) {
   const { slug } = await params;
 
+  const meeting = await prisma.councilMeeting.findUnique({
+    where: { slug },
+  });
+
+  if (!meeting || meeting.status !== "summarized") {
+    notFound();
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="mb-4 text-3xl font-bold">Council Meeting</h1>
-      <p className="text-muted">Meeting slug: {slug}</p>
-      <div className="mt-8 rounded-xl border border-card-border bg-card-bg p-8 text-center">
-        <p className="text-muted">Meeting summary will appear here once ingested.</p>
-      </div>
+      <article>
+        <h1 className="mb-2 text-3xl font-bold">{meeting.title}</h1>
+        <p className="mb-8 text-sm text-muted">
+          {new Date(meeting.meetingDate).toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </p>
+        <div className="whitespace-pre-wrap leading-relaxed">
+          {meeting.summary}
+        </div>
+      </article>
     </div>
   );
 }
