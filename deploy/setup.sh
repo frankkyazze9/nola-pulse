@@ -10,7 +10,7 @@ SERVICE_NAME="nola-pulse"
 DB_INSTANCE="nola-pulse-db"
 DB_NAME="nolapulse"
 DB_USER="nolapulse"
-ARTIFACT_REPO="nola-pulse"
+ARTIFACT_REPO="nola-pulse-repo"
 
 echo "=== NOLA Pulse GCP Setup ==="
 echo "Project: $PROJECT_ID"

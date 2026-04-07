@@ -1,9 +1,12 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'us-south1-docker.pkg.dev/$PROJECT_ID/nola-pulse/app:$COMMIT_SHA', '.']
+    args: ['build', '-t', 'us-south1-docker.pkg.dev/$PROJECT_ID/nola-pulse-repo/app:$BUILD_ID', '-t', 'us-south1-docker.pkg.dev/$PROJECT_ID/nola-pulse-repo/app:latest', '.']
 
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'us-south1-docker.pkg.dev/$PROJECT_ID/nola-pulse/app:$COMMIT_SHA']
+    args: ['push', 'us-south1-docker.pkg.dev/$PROJECT_ID/nola-pulse-repo/app:$BUILD_ID']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-south1-docker.pkg.dev/$PROJECT_ID/nola-pulse-repo/app:latest']
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -12,12 +15,16 @@ steps:
       - 'deploy'
       - 'nola-pulse'
       - '--image'
-      - 'us-south1-docker.pkg.dev/$PROJECT_ID/nola-pulse/app:$COMMIT_SHA'
+      - 'us-south1-docker.pkg.dev/$PROJECT_ID/nola-pulse-repo/app:$BUILD_ID'
       - '--region'
       - 'us-south1'
       - '--port'
       - '8080'
       - '--allow-unauthenticated'
+      - '--set-secrets'
+      - 'DATABASE_URL=DATABASE_URL:latest,AUTH_SECRET=AUTH_SECRET:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,CRON_SECRET=CRON_SECRET:latest'
+      - '--add-cloudsql-instances'
+      - 'nola-ai-innovation:us-south1:nola-pulse-db'
 
 options:
   logging: CLOUD_LOGGING_ONLY

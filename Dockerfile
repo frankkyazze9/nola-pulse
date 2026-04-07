@@ -2,6 +2,7 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 RUN npm ci
 RUN npx prisma generate
 
@@ -9,6 +10,8 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Copy Prisma generated client from deps stage (it's gitignored so not in COPY . .)
+COPY --from=deps /app/app/generated ./app/generated
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV AUTH_SECRET="build-time-placeholder"
 RUN npm run build
