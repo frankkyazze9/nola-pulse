@@ -185,6 +185,18 @@ export class Agent {
     return id;
   }
 
+  // --- Vector Search ---
+
+  async searchKB(query: string, topK: number = 5): Promise<{ content: string; source: string }[]> {
+    try {
+      const { searchKB: search } = await import("./vector-search");
+      const results = await search(query, topK);
+      return results.map((r) => ({ content: r.content, source: `${r.source_table}/${r.source_id}` }));
+    } catch {
+      return [];
+    }
+  }
+
   // --- Claude API ---
 
   async think(systemPrompt: string, userPrompt: string, options?: { model?: string; maxTokens?: number }): Promise<string> {

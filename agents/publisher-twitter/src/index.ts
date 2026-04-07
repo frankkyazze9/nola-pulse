@@ -159,7 +159,7 @@ async function postThread(tweets: string[]): Promise<string[]> {
 }
 
 async function main() {
-  const command = process.argv[2] || "draft";
+  const command: string = process.argv[2] || "draft";
 
   await agent.run(async () => {
     if (command === "thread") {
@@ -174,12 +174,8 @@ async function main() {
         insightId: null,
       });
 
-      if (command !== "draft") {
-        await postThread(tweets);
-      } else {
-        console.log(`\nDRAFT THREAD:\n`);
-        tweets.forEach((t, i) => console.log(`${i + 1}. ${t}\n`));
-      }
+      console.log(`\nDRAFT THREAD:\n`);
+      tweets.forEach((t, i) => console.log(`${i + 1}. ${t}\n`));
     } else {
       console.log(`[${agent.name}] Generating daily tweet...`);
       const { tweet } = await generateDailyTweet();
