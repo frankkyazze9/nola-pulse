@@ -7,6 +7,7 @@ import Anthropic from "@anthropic-ai/sdk";
 const PROJECT_ID = "nola-ai-innovation";
 const KB_DATASET = "nola_pulse_kb";
 const KB_BUCKET = "nola-pulse-kb";
+const FIRESTORE_DB = "agents";
 
 export interface AgentConfig {
   name: string;
@@ -56,7 +57,7 @@ export class Agent {
     this.pubsub = new PubSub({ projectId: PROJECT_ID });
     this.bigquery = new BigQuery({ projectId: PROJECT_ID });
     this.storage = new Storage({ projectId: PROJECT_ID });
-    this.firestore = new Firestore({ projectId: PROJECT_ID });
+    this.firestore = new Firestore({ projectId: PROJECT_ID, databaseId: FIRESTORE_DB });
     this.claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
 
@@ -81,7 +82,22 @@ export class Agent {
 
   async insertKB(table: string, rows: object[]): Promise<void> {
     const dataset = this.bigquery.dataset(KB_DATASET);
-    await dataset.table(table).insert(rows);
+    try {
+      await dataset.table(table).insert(rows, {
+        ignoreUnknownValues: true,
+        skipInvalidRows: true,
+      });
+    } catch (err: any) {
+      if (err.name === "PartialFailureError" && err.errors) {
+        const sampleError = err.errors[0]?.errors?.[0];
+        console.warn(
+          `[${this.name}] BigQuery partial insert failure on ${table}: ${err.errors.length} rows failed. Sample: ${JSON.stringify(sampleError)}`
+        );
+        // Don't rethrow — partial success is better than total failure
+      } else {
+        throw err;
+      }
+    }
   }
 
   // --- Knowledge Base: Cloud Storage ---
@@ -102,18 +118,26 @@ export class Agent {
   // --- Agent State: Firestore ---
 
   async reportStatus(status: "running" | "idle" | "error", details?: string): Promise<void> {
-    await this.firestore.doc(`agents/${this.name}`).set(
-      {
-        status,
-        details: details || null,
-        lastRun: new Date().toISOString(),
-        version: this.version,
-        type: this.type,
-      },
-      { merge: true }
-    );
+    try {
+      await this.firestore.doc(`agents/${this.name}`).set(
+        {
+          status,
+          details: details || null,
+          lastRun: new Date().toISOString(),
+          version: this.version,
+          type: this.type,
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn(`[${this.name}] Firestore status update failed (non-fatal):`, (err as Error).message);
+    }
 
-    await this.publish("agent.status", { agent: this.name, status, details });
+    try {
+      await this.publish("agent.status", { agent: this.name, status, details });
+    } catch (err) {
+      console.warn(`[${this.name}] Pub/Sub status publish failed (non-fatal):`, (err as Error).message);
+    }
   }
 
   async submitDraft(draft: Omit<ContentDraft, "id" | "createdAt" | "createdBy" | "status">): Promise<string> {

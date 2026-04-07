@@ -27,7 +27,7 @@ async function main() {
 
     // --- Employee Salaries ---
     let salaryCount = 0;
-    for await (const batch of socrata.paginate(DATASETS.EMPLOYEE_SALARIES)) {
+    try { for await (const batch of socrata.paginate(DATASETS.EMPLOYEE_SALARIES)) {
       const rows = batch.map((r: any) => ({
         employee_name: r.employee_name || r.name || null,
         position_title: r.position_title || r.title || null,
@@ -40,7 +40,7 @@ async function main() {
         await agent.insertKB("employee_salaries", rows);
         salaryCount += rows.length;
       }
-    }
+    } } catch (err: any) { console.log(`[${agent.name}] Employee salaries: ${err.message} (skipping)`); }
 
     // --- Business Licenses ---
     let bizCount = 0;
