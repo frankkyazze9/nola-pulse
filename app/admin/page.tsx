@@ -1,48 +1,52 @@
+import { StatsBar } from "@/components/admin/StatsBar";
+import { AgentStatusGrid } from "@/components/admin/AgentStatusGrid";
+import { ContentQueue } from "@/components/admin/ContentQueue";
+import Link from "next/link";
+
 export default function AdminPage() {
   return (
-    <div className="mx-auto max-w-7xl px-6 py-12">
-      <h1 className="mb-2 text-3xl font-bold">
-        <span className="text-accent">Admin</span> Panel
-      </h1>
-      <p className="mb-8 text-muted">
-        Manage data pipelines, review articles, and trigger content generation.
-      </p>
-
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {[
-          {
-            title: "Article Generation",
-            description: "Trigger daily article generation, review drafts, publish.",
-          },
-          {
-            title: "Council Ingest",
-            description: "Paste council transcripts for AI summarization.",
-          },
-          {
-            title: "Pipeline Status",
-            description: "Monitor data pipeline health and last-run times.",
-          },
-          {
-            title: "Infographic Generator",
-            description: "Generate comedic infographics from civic data.",
-          },
-          {
-            title: "Forum Moderation",
-            description: "Review and manage community suggestions.",
-          },
-          {
-            title: "Data Sources",
-            description: "Configure and test external data connections.",
-          },
-        ].map((item) => (
-          <div
-            key={item.title}
-            className="rounded-xl border border-card-border bg-card-bg p-6"
+    <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">
+            <span className="text-accent">Command</span> Center
+          </h1>
+          <p className="text-muted">NOLA Pulse Agent Operations</p>
+        </div>
+        <div className="flex gap-3">
+          <Link
+            href="/admin/content"
+            className="rounded-lg bg-card-bg px-4 py-2 text-sm font-medium text-muted hover:text-foreground"
           >
-            <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
-            <p className="text-sm text-muted">{item.description}</p>
-          </div>
-        ))}
+            Content Queue
+          </Link>
+          <Link
+            href="/admin/kb"
+            className="rounded-lg bg-card-bg px-4 py-2 text-sm font-medium text-muted hover:text-foreground"
+          >
+            Knowledge Base
+          </Link>
+          <Link
+            href="/admin/agents"
+            className="rounded-lg bg-card-bg px-4 py-2 text-sm font-medium text-muted hover:text-foreground"
+          >
+            Agents
+          </Link>
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <StatsBar />
+      </div>
+
+      <div className="mb-8">
+        <h2 className="mb-4 text-xl font-semibold">Agent Status</h2>
+        <AgentStatusGrid />
+      </div>
+
+      <div>
+        <h2 className="mb-4 text-xl font-semibold">Content Review Queue</h2>
+        <ContentQueue />
       </div>
     </div>
   );
