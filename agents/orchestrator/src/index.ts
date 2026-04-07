@@ -61,8 +61,23 @@ async function runAnalysts() {
   }
 }
 
+async function runTwitter() {
+  console.log("\n🐦 PHASE 3: TWITTER — Generating content...\n");
+
+  try {
+    const twitter = await import("../../publisher-twitter/src/index");
+    const { tweet } = await twitter.generateDailyTweet();
+    console.log(`  ✓ Daily tweet drafted: "${tweet.slice(0, 60)}..."\n`);
+
+    const thread = await twitter.generateThread();
+    console.log(`  ✓ Thread drafted: ${thread.length} tweets\n`);
+  } catch (err) {
+    console.log(`  ✗ Twitter content failed: ${(err as Error).message}\n`);
+  }
+}
+
 async function runQA() {
-  console.log("\n🔎 PHASE 3: QA — Auditing site...\n");
+  console.log("\n🔎 PHASE 4: QA — Auditing site...\n");
 
   try {
     const qa = await import("../../qa-auditor/src/index");
@@ -86,7 +101,10 @@ async function runSprint() {
     // Phase 2: Analysts find stories
     await runAnalysts();
 
-    // Phase 3: QA audits everything
+    // Phase 3: Generate Twitter content
+    await runTwitter();
+
+    // Phase 4: QA audits everything
     await runQA();
 
     console.log("═".repeat(60));
@@ -103,6 +121,7 @@ const commands: Record<string, () => Promise<void>> = {
   sprint: runSprint,
   scouts: async () => { await agent.run(() => runScouts().then(() => {})); },
   analyze: async () => { await agent.run(runAnalysts); },
+  twitter: async () => { await agent.run(runTwitter); },
   audit: async () => { await agent.run(runQA); },
 };
 
