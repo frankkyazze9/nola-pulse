@@ -22,7 +22,7 @@ steps:
       - '8080'
       - '--allow-unauthenticated'
       - '--set-secrets'
-      - 'DATABASE_URL=DATABASE_URL:latest,AUTH_SECRET=AUTH_SECRET:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,CRON_SECRET=CRON_SECRET:latest'
+      - 'DATABASE_URL=DATABASE_URL:latest,AUTH_SECRET=AUTH_SECRET:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,CRON_SECRET=CRON_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,ADMIN_EMAILS=ADMIN_EMAILS:latest'
       - '--add-cloudsql-instances'
       - 'nola-ai-innovation:us-south1:nola-pulse-db'
 
