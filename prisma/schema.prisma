@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Article {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  body        String    @db.Text
+  topic       String
+  status      String    @default("draft")
+  publishedAt DateTime?
+  generatedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("articles")
+}
+
+model CouncilMeeting {
+  id            String   @id @default(cuid())
+  meetingDate   DateTime
+  title         String
+  slug          String   @unique
+  rawTranscript String?  @db.Text
+  summary       String?  @db.Text
+  keyDecisions  Json?
+  storageUrl    String?
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+
+  @@map("council_meetings")
+}
+
+model OutageRecord {
+  id               String    @id @default(cuid())
+  recordedAt       DateTime  @default(now())
+  zipCode          String
+  neighborhood     String?
+  customersOut     Int
+  cause            String?
+  estimatedRestore DateTime?
+
+  @@map("outage_records")
+}
+
+model BudgetLineItem {
+  id          String @id @default(cuid())
+  fiscalYear  Int
+  department  String
+  fund        String
+  category    String
+  description String
+  amount      Int
+
+  @@map("budget_line_items")
+}
+
+model DisplacementEvent {
+  id           String   @id @default(cuid())
+  eventType    String
+  address      String
+  neighborhood String
+  latitude     Float?
+  longitude    Float?
+  date         DateTime
+  details      Json?
+  source       String
+  createdAt    DateTime @default(now())
+
+  @@map("displacement_events")
+}
+
+model FloodPrediction {
+  id          String   @id @default(cuid())
+  area        String
+  riskLevel   String
+  predictedAt DateTime @default(now())
+  validUntil  DateTime
+  rainfallMm  Float?
+  pumpStatus  Json?
+  source      String
+
+  @@map("flood_predictions")
+}
+
+model ForumPost {
+  id          String   @id @default(cuid())
+  title       String
+  body        String   @db.Text
+  authorName  String
+  authorEmail String?
+  votes       Int      @default(0)
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+
+  @@map("forum_posts")
+}
+
+model Infographic {
+  id          String    @id @default(cuid())
+  title       String
+  caption     String    @db.Text
+  imageUrl    String
+  tweetText   String?   @db.Text
+  topic       String
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("infographics")
+}
