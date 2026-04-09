@@ -19,23 +19,31 @@ export default async function ArticlePage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12">
+    <div className="mx-auto max-w-2xl px-4 py-8">
       <article>
-        <h1 className="mb-4 text-3xl font-bold">{article.title}</h1>
-        <p className="mb-8 text-sm text-muted">
+        <h1 className="text-3xl font-bold leading-tight mb-2">
+          {article.title}
+        </h1>
+        <p className="text-xs text-muted mb-8">
           {article.publishedAt
             ? new Date(article.publishedAt).toLocaleDateString("en-US", {
                 weekday: "long",
-                year: "numeric",
                 month: "long",
                 day: "numeric",
+                year: "numeric",
               })
             : ""}
         </p>
-        <div className="prose prose-invert max-w-none whitespace-pre-wrap text-foreground leading-relaxed">
-          {article.body}
+        <div className="whitespace-pre-wrap leading-7 text-foreground">
+          {article.body
+            .replace(/^#.*\n/m, "")
+            .replace(/^#+\s/gm, "")
+            .trim()}
         </div>
       </article>
+      <div className="mt-12 pt-4 border-t border-card-border">
+        <a href="/" className="text-sm">&larr; Back to stories</a>
+      </div>
     </div>
   );
 }

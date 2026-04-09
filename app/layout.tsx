@@ -1,17 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Nav } from "@/components/Nav";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "NOLA Pulse",
@@ -25,15 +13,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
-        <Nav />
+    <html lang="en" className="h-full">
+      <body className="min-h-full flex flex-col text-base leading-relaxed">
+        <header className="border-b border-card-border">
+          <div className="mx-auto max-w-2xl px-4 py-3">
+            <div className="flex items-baseline justify-between">
+              <a href="/" className="text-2xl font-bold tracking-tight no-underline text-foreground">
+                NOLA PULSE
+              </a>
+              <nav className="flex gap-4 text-sm">
+                <a href="/articles">Stories</a>
+                <a href="/about">About</a>
+              </nav>
+            </div>
+            <p className="text-xs text-muted mt-0.5">New Orleans news & data</p>
+          </div>
+        </header>
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-card-border px-6 py-8 text-center text-sm text-muted">
-          <p>NOLA Pulse</p>
+        <footer className="border-t border-card-border px-4 py-6 text-center text-xs text-muted">
+          <p>NOLA Pulse &middot; data from <a href="https://data.nola.gov">data.nola.gov</a></p>
         </footer>
       </body>
     </html>
