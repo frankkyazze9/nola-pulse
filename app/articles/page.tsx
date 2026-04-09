@@ -12,12 +12,9 @@ export default async function ArticlesPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="mb-2 text-3xl font-bold">
-        <span className="text-accent">The Picayune</span> (Satire)
-      </h1>
+      <h1 className="mb-2 text-3xl font-bold">Stories</h1>
       <p className="mb-8 text-muted">
-        Onion-style satirical articles about New Orleans. Fake headlines, real
-        data. Every number cited is from actual city records.
+        All stories. Every number cited comes from public city records.
       </p>
 
       {articles.length === 0 ? (

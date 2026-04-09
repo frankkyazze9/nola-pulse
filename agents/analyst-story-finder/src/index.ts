@@ -69,21 +69,21 @@ async function findTodaysStory() {
 
     // Ask Claude to identify the most compelling story
     const analysis = await agent.think(
-      `You are a satirical comedy writer for NOLA Pulse — a New Orleans meme/satire platform like The Onion, but backed by real civic data. Your job is to find the funniest, most absurd, most roast-worthy data point from today's numbers.
+      `You are a data journalist for NOLA Pulse, a New Orleans news outlet. Your job is to find the most interesting, surprising, or revealing data point from today's civic records.
 
-Think like a comedy writer at The Onion who lives in New Orleans: what's so broken it's hilarious? What stat makes you laugh because the alternative is crying? What would make someone screenshot this and send it to their group chat?
+Look for: things that are absurd when you actually look at the numbers, patterns nobody is talking about, comparisons that reveal priorities, or stats that tell a bigger story. The goal is to find scoops — things that make people say "wait, seriously?"
 
-The humor comes from the fact that the numbers are REAL. You're not making anything up — reality is the joke.`,
+You're not trying to be funny. You're finding real stories in real data. If the story happens to be absurd, that's because reality is absurd.`,
       `Here is the latest data from across New Orleans civic systems:
 
 ${hasData ? dataContext : "No recent data in the knowledge base yet. Use your knowledge of current New Orleans civic issues — Entergy outages, housing displacement, infrastructure failures, city council decisions, drainage problems, education challenges, or whatever is most pressing right now."}
 
-Based on this data, find the SINGLE funniest/most absurd data point and write an Onion-style headline for it. Return in this exact JSON format:
+Based on this data, find the SINGLE most interesting story. Write a headline that's compelling and specific — a real headline, not a joke. Return in this exact JSON format:
 
 {
   "type": "story",
-  "headline": "Onion-style satirical headline (funny, punchy, under 15 words)",
-  "summary": "2-3 paragraph satirical article setup — written like The Onion but based on real data",
+  "headline": "Compelling, specific headline (under 15 words, reads like real news)",
+  "summary": "2-3 paragraph story setup explaining why this matters and what the data shows",
   "dataPoints": [
     {"label": "stat name", "value": "stat value", "source": "where this came from"}
   ],
@@ -115,14 +115,14 @@ Return ONLY the JSON, no markdown fences.`,
       const voiceGuide = loadVoiceGuide();
 
       const articleBody = await agent.think(
-        `You are writing a satirical article for NOLA Pulse — a New Orleans comedy/satire site like The Onion, but every stat is real. Follow this voice guide:\n\n${voiceGuide}\n\nWrite in The Onion's style: deadpan delivery, absurd framing, real facts presented in the most devastating way possible. The humor comes from treating insane civic dysfunction as normal.`,
-        `Write an Onion-style satirical article based on this:
+        `You are writing an article for NOLA Pulse, a New Orleans news outlet. Follow this voice guide EXACTLY:\n\n${voiceGuide}\n\nYou're a journalist who lives in New Orleans and writes about the city with the same energy you'd use telling a friend about something wild you just found out. You take the reporting seriously — every number is real, every fact is sourced — but your voice is distinctly human. Sarcasm when it's earned. Metaphors that land. The kind of writing that makes someone text the link to their group chat.`,
+        `Write an article based on this:
 
 Headline: ${insight.headline}
-Setup: ${insight.summary}
-Real Data: ${JSON.stringify(insight.dataPoints)}
+Context: ${insight.summary}
+Data: ${JSON.stringify(insight.dataPoints)}
 
-The article should be 400-700 words. Deadpan tone — present the absurd reality as if it's completely normal. Include fake quotes from fake residents/officials that feel painfully real. Every data point cited should be the actual number from the data. End with something that makes you laugh and then feel bad for laughing.`,
+500-700 words. Lead with the most striking fact. Write it straight — the absurdity of the data speaks for itself. Use Frank's voice: direct, conversational, occasionally devastating. Every stat cited must be the real number. No fake quotes. End with something that sits with the reader.`,
         { maxTokens: 2000 }
       );
 
