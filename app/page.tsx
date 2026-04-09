@@ -2,74 +2,66 @@ import { FeatureCard } from "@/components/FeatureCard";
 
 const features = [
   {
-    href: "/dashboard",
-    title: "NOLA Pulse Dashboard",
+    href: "/articles",
+    title: "The Picayune (Satire)",
     description:
-      "Real-time civic data — infrastructure stats, city KPIs, and the numbers nobody talks about.",
-    status: "coming-soon" as const,
+      "Onion-style articles about New Orleans. Fake headlines, real data. The news the city deserves.",
+    status: "live" as const,
+    icon: "📰",
+  },
+  {
+    href: "/dashboard",
+    title: "The Numbers",
+    description:
+      "Real civic data that's so bad it's funny. 311 complaints, blight cases, and other evidence that God has a sense of humor.",
+    status: "live" as const,
     icon: "📊",
   },
   {
-    href: "/council",
-    title: "Council Whisperer",
+    href: "/displacement",
+    title: "Airbnb vs Actual Humans",
     description:
-      "AI-generated summaries of city council meetings. What they said, what they meant, what it means for you.",
-    status: "coming-soon" as const,
-    icon: "🏛️",
+      "4,090 STR licenses and counting. A neighborhood-by-neighborhood look at who's winning: tourists or residents. (Spoiler: tourists.)",
+    status: "live" as const,
+    icon: "🏘️",
   },
   {
     href: "/blackout",
-    title: "Blackout Prediction",
+    title: "Entergy Bingo",
     description:
-      "Predicting power outages before Entergy tells you. Because 304,178 outages a year is not acceptable.",
-    status: "coming-soon" as const,
+      "304,178 outages in 2025. At this point the power going out IS the New Orleans experience.",
+    status: "live" as const,
     icon: "⚡",
   },
   {
     href: "/floods",
-    title: "Flood Predictions",
+    title: "Flood Roulette",
     description:
-      "Flood risk by neighborhood, pump station status, and drainage reality checks.",
-    status: "coming-soon" as const,
+      "$939M in drainage upgrades needed. 7% funded. Catch basins haven't been cleaned since the 90s. Good luck out there.",
+    status: "live" as const,
     icon: "🌊",
   },
   {
-    href: "/displacement",
-    title: "Displacement Tracker",
-    description:
-      "Tracking where people are being pushed out — STRs, evictions, demolitions, and the quiet erasure of neighborhoods.",
-    status: "coming-soon" as const,
-    icon: "🏘️",
-  },
-  {
-    href: "/entities",
-    title: "Entity Predictions",
-    description:
-      "Tracking organizations, contracts, and the money trail through New Orleans.",
-    status: "coming-soon" as const,
-    icon: "🔍",
-  },
-  {
     href: "/budget",
-    title: "Budget Explorer",
+    title: "Where the Money Goes",
     description:
-      "Where the city's money actually goes. Interactive, searchable, and impossible to spin.",
-    status: "coming-soon" as const,
+      "City salaries, tax revenue, and business licenses. Someone's getting paid. Let's find out who.",
+    status: "live" as const,
     icon: "💰",
   },
   {
-    href: "/articles",
-    title: "Daily Article",
+    href: "/entities",
+    title: "Who Runs This City",
     description:
-      "AI-generated daily civic analysis written in Frank's voice. Data meets storytelling.",
-    status: "coming-soon" as const,
-    icon: "📝",
+      "Every elected official, what they oversee, and the data on their watch. Public servants, public record.",
+    status: "live" as const,
+    icon: "🏛️",
   },
   {
     href: "/forum",
-    title: "Community Forum",
+    title: "Suggest a Meme",
     description:
-      "Suggest the next AI project for New Orleans. Vote on what matters most.",
+      "Got a New Orleans experience that needs to be roasted? Drop it here.",
     status: "coming-soon" as const,
     icon: "💬",
   },
@@ -83,12 +75,11 @@ export default function Home() {
           <span className="text-accent">NOLA</span> Pulse
         </h1>
         <p className="mx-auto max-w-2xl text-lg text-muted">
-          AI-powered civic intelligence for New Orleans. Data that holds power
-          accountable, predictions that keep people safe, and tools that make
-          government accessible.
+          New Orleans memes backed by real civic data. Because the only way to
+          deal with 355-day pothole response times is to laugh about it.
         </p>
         <p className="mt-4 text-sm text-muted">
-          For the people who actually live here.
+          Satire. Data. Chaos. For the people who actually live here.
         </p>
       </div>
 

@@ -13,11 +13,11 @@ export default async function ArticlesPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="mb-2 text-3xl font-bold">
-        <span className="text-accent">Daily</span> Article
+        <span className="text-accent">The Picayune</span> (Satire)
       </h1>
       <p className="mb-8 text-muted">
-        AI-generated civic analysis. The most interesting thing happening in New
-        Orleans, explained by someone who actually lives here.
+        Onion-style satirical articles about New Orleans. Fake headlines, real
+        data. Every number cited is from actual city records.
       </p>
 
       {articles.length === 0 ? (

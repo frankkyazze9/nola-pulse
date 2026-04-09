@@ -69,19 +69,21 @@ async function findTodaysStory() {
 
     // Ask Claude to identify the most compelling story
     const analysis = await agent.think(
-      `You are a civic data analyst for New Orleans. Your job is to identify the single most compelling, newsworthy, or important civic story from today's data. Think like a local journalist who actually lives in New Orleans and cares about the city.
+      `You are a satirical comedy writer for NOLA Pulse — a New Orleans meme/satire platform like The Onion, but backed by real civic data. Your job is to find the funniest, most absurd, most roast-worthy data point from today's numbers.
 
-Focus on: what affects residents most, what holds power accountable, what reveals a pattern nobody is talking about, or what's genuinely surprising.`,
+Think like a comedy writer at The Onion who lives in New Orleans: what's so broken it's hilarious? What stat makes you laugh because the alternative is crying? What would make someone screenshot this and send it to their group chat?
+
+The humor comes from the fact that the numbers are REAL. You're not making anything up — reality is the joke.`,
       `Here is the latest data from across New Orleans civic systems:
 
 ${hasData ? dataContext : "No recent data in the knowledge base yet. Use your knowledge of current New Orleans civic issues — Entergy outages, housing displacement, infrastructure failures, city council decisions, drainage problems, education challenges, or whatever is most pressing right now."}
 
-Based on this data, identify the SINGLE most compelling story. Return your analysis in this exact JSON format:
+Based on this data, find the SINGLE funniest/most absurd data point and write an Onion-style headline for it. Return in this exact JSON format:
 
 {
   "type": "story",
-  "headline": "One-line headline (under 15 words)",
-  "summary": "2-3 paragraph analysis of why this matters and what the data shows",
+  "headline": "Onion-style satirical headline (funny, punchy, under 15 words)",
+  "summary": "2-3 paragraph satirical article setup — written like The Onion but based on real data",
   "dataPoints": [
     {"label": "stat name", "value": "stat value", "source": "where this came from"}
   ],
@@ -113,14 +115,14 @@ Return ONLY the JSON, no markdown fences.`,
       const voiceGuide = loadVoiceGuide();
 
       const articleBody = await agent.think(
-        `You are writing a daily civic article about New Orleans as Frank Kyazze. Follow this voice guide EXACTLY:\n\n${voiceGuide}`,
-        `Write today's NOLA Pulse daily article based on this story:
+        `You are writing a satirical article for NOLA Pulse — a New Orleans comedy/satire site like The Onion, but every stat is real. Follow this voice guide:\n\n${voiceGuide}\n\nWrite in The Onion's style: deadpan delivery, absurd framing, real facts presented in the most devastating way possible. The humor comes from treating insane civic dysfunction as normal.`,
+        `Write an Onion-style satirical article based on this:
 
 Headline: ${insight.headline}
-Analysis: ${insight.summary}
-Key Data: ${JSON.stringify(insight.dataPoints)}
+Setup: ${insight.summary}
+Real Data: ${JSON.stringify(insight.dataPoints)}
 
-The article should be 500-800 words. Open with a specific moment or fact, not a thesis. Write like you're talking to a friend at a bar who cares about this city. Include the data points naturally. End on resonance, not resolution.`,
+The article should be 400-700 words. Deadpan tone — present the absurd reality as if it's completely normal. Include fake quotes from fake residents/officials that feel painfully real. Every data point cited should be the actual number from the data. End with something that makes you laugh and then feel bad for laughing.`,
         { maxTokens: 2000 }
       );
 
