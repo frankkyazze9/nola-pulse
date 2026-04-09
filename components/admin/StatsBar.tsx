@@ -1,69 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase-client";
-import { collection, onSnapshot } from "firebase/firestore";
 
 interface Stats {
-  totalAgents: number;
-  runningAgents: number;
-  errorAgents: number;
+  agents: number;
   pendingReview: number;
-  publishedToday: number;
+  published: number;
+  total: number;
 }
 
 export function StatsBar() {
-  const [stats, setStats] = useState<Stats>({
-    totalAgents: 0,
-    runningAgents: 0,
-    errorAgents: 0,
-    pendingReview: 0,
-    publishedToday: 0,
-  });
+  const [stats, setStats] = useState<Stats>({ agents: 0, pendingReview: 0, published: 0, total: 0 });
 
   useEffect(() => {
-    const unsubAgents = onSnapshot(collection(db, "agents"), (snapshot) => {
-      let total = 0, running = 0, errors = 0;
-      snapshot.forEach((doc) => {
-        total++;
-        const data = doc.data();
-        if (data.status === "running") running++;
-        if (data.status === "error") errors++;
+    Promise.all([
+      fetch("/api/admin/agents-status").then((r) => r.json()),
+      fetch("/api/admin/content-queue").then((r) => r.json()),
+    ]).then(([agents, content]) => {
+      setStats({
+        agents: agents.length,
+        pendingReview: content.filter((c: any) => c.status === "pending_review").length,
+        published: content.filter((c: any) => c.status === "published").length,
+        total: content.length,
       });
-      setStats((s) => ({ ...s, totalAgents: total, runningAgents: running, errorAgents: errors }));
-    });
-
-    const unsubContent = onSnapshot(collection(db, "content-queue"), (snapshot) => {
-      let pending = 0, published = 0;
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.status === "pending_review") pending++;
-        if (data.status === "published" && new Date(data.createdAt) >= todayStart) published++;
-      });
-      setStats((s) => ({ ...s, pendingReview: pending, publishedToday: published }));
-    });
-
-    return () => { unsubAgents(); unsubContent(); };
+    }).catch(() => {});
   }, []);
 
-  const statCards = [
-    { label: "Agents", value: stats.totalAgents, sub: `${stats.runningAgents} running` },
-    { label: "Errors", value: stats.errorAgents, color: stats.errorAgents > 0 ? "text-danger" : "text-success" },
-    { label: "Pending Review", value: stats.pendingReview, color: stats.pendingReview > 0 ? "text-warning" : "text-muted" },
-    { label: "Published Today", value: stats.publishedToday },
-  ];
-
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      {statCards.map((stat) => (
-        <div key={stat.label} className="rounded-xl border border-card-border bg-card-bg p-4">
-          <p className="text-xs text-muted">{stat.label}</p>
-          <p className={`text-2xl font-bold ${stat.color || "text-foreground"}`}>{stat.value}</p>
-          {stat.sub && <p className="text-xs text-muted">{stat.sub}</p>}
-        </div>
-      ))}
+    <div className="grid grid-cols-4 gap-3 text-center">
+      <div className="border border-card-border p-3">
+        <p className="text-2xl font-bold">{stats.agents}</p>
+        <p className="text-xs text-muted">Agents</p>
+      </div>
+      <div className="border border-card-border p-3">
+        <p className="text-2xl font-bold">{stats.pendingReview}</p>
+        <p className="text-xs text-muted">Pending Review</p>
+      </div>
+      <div className="border border-card-border p-3">
+        <p className="text-2xl font-bold">{stats.published}</p>
+        <p className="text-xs text-muted">Published</p>
+      </div>
+      <div className="border border-card-border p-3">
+        <p className="text-2xl font-bold">{stats.total}</p>
+        <p className="text-xs text-muted">Total Content</p>
+      </div>
     </div>
   );
 }
