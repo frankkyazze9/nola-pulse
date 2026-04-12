@@ -1,3 +1,12 @@
+// Dark Horse — political OSINT research tool.
+// Schema inspired by OpenSanctions FollowTheMoney; jurisdictions/offices use
+// Open Civic Data OCD-IDs; persons cross-link to Wikidata QIDs where possible.
+//
+// The pgvector `embedding vector(384)` column on DocumentChunk and the tsvector
+// `tsv` full-text column are added by raw SQL in the initial migration because
+// Prisma doesn't have native support for either. See
+// prisma/migrations/20260411000000_dark_horse_init/migration.sql.
+
 generator client {
   provider = "prisma-client"
   output   = "../app/generated/prisma"
@@ -7,110 +16,332 @@ datasource db {
   provider = "postgresql"
 }
 
-model Article {
-  id          String    @id @default(cuid())
-  slug        String    @unique
-  title       String
-  body        String    @db.Text
-  topic       String
-  status      String    @default("draft")
-  publishedAt DateTime?
-  generatedAt DateTime  @default(now())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+// -- Entities ---------------------------------------------------------------
 
-  @@map("articles")
+model Person {
+  id             String    @id @default(cuid())
+  ocdId          String?   @unique
+  wikidataQid    String?   @unique
+  fecCandidateId String?   @unique
+  laEthicsId     String?   @unique
+  givenName      String
+  middleName     String?
+  familyName     String
+  suffix         String?
+  aliases        String[]
+  dateOfBirth    DateTime?
+  party          String?
+  bio            String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  memberships    Membership[]
+  candidacies    Candidacy[]
+  terms          Term[]
+  donationsGiven Donation[]       @relation("personDonations")
+  ownerships     Ownership[]      @relation("personOwnership")
+  courtParties   CourtCaseParty[]
+  claims         Claim[]          @relation("personClaims")
+
+  @@index([familyName, givenName])
 }
 
-model CouncilMeeting {
+model Organization {
+  id             String   @id @default(cuid())
+  ocdId          String?  @unique
+  wikidataQid    String?  @unique
+  fecCommitteeId String?  @unique
+  einNumber      String?  @unique
+  name           String
+  aliases        String[]
+  orgType        String   // party | committee | pac | business | nonprofit | agency | court
+  website        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  memberships       Membership[]
+  donationsGiven    Donation[]      @relation("orgDonationsGiven")
+  donationsReceived Donation[]      @relation("orgDonationsReceived")
+  vendorPayments    VendorPayment[]
+  ownerships        Ownership[]     @relation("orgOwnership")
+  claims            Claim[]         @relation("orgClaims")
+
+  @@index([name])
+}
+
+// -- Jurisdictions, offices, terms ------------------------------------------
+
+model Jurisdiction {
+  id               String   @id @default(cuid())
+  ocdId            String   @unique
+  name             String
+  jurisdictionType String // state | parish | municipality | court_district
+  parentId         String?
+  parent           Jurisdiction?  @relation("jurisdictionParent", fields: [parentId], references: [id])
+  children         Jurisdiction[] @relation("jurisdictionParent")
+
+  posts     Post[]
+  elections Election[]
+}
+
+model Post {
+  id             String   @id @default(cuid())
+  ocdId          String?  @unique
+  jurisdictionId String
+  jurisdiction   Jurisdiction @relation(fields: [jurisdictionId], references: [id])
+  label          String // "Mayor of New Orleans", "Orleans Parish CDC Judge, Section A"
+  postType       String // executive | legislative | judicial | law_enforcement
+
+  terms       Term[]
+  candidacies Candidacy[]
+}
+
+model Term {
+  id        String    @id @default(cuid())
+  postId    String
+  post      Post      @relation(fields: [postId], references: [id])
+  personId  String
+  person    Person    @relation(fields: [personId], references: [id])
+  startDate DateTime
+  endDate   DateTime?
+  howEnded  String? // elected | appointed | term_limited | resigned | defeated
+
+  @@index([personId])
+  @@index([postId])
+}
+
+model Election {
+  id             String   @id @default(cuid())
+  ocdId          String?  @unique
+  date           DateTime
+  jurisdictionId String
+  jurisdiction   Jurisdiction @relation(fields: [jurisdictionId], references: [id])
+  electionType   String // primary | general | runoff | special
+
+  candidacies Candidacy[]
+}
+
+model Candidacy {
+  id            String  @id @default(cuid())
+  personId      String
+  person        Person  @relation(fields: [personId], references: [id])
+  electionId    String
+  election      Election @relation(fields: [electionId], references: [id])
+  postId        String
+  post          Post    @relation(fields: [postId], references: [id])
+  outcome       String? // won | lost | withdrew | pending
+  votesReceived Int?
+  votesPct      Float?
+
+  @@index([personId])
+  @@index([electionId])
+}
+
+model Membership {
+  id             String    @id @default(cuid())
+  personId       String
+  person         Person    @relation(fields: [personId], references: [id])
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  role           String // party affiliation, board seat, employment, etc.
+  startDate      DateTime?
+  endDate        DateTime?
+}
+
+// -- Money ------------------------------------------------------------------
+
+model Donation {
+  id               String        @id @default(cuid())
+  donorPersonId    String?
+  donorPerson      Person?       @relation("personDonations", fields: [donorPersonId], references: [id])
+  donorOrgId       String?
+  donorOrg         Organization? @relation("orgDonationsGiven", fields: [donorOrgId], references: [id])
+  recipientId      String
+  recipient        Organization  @relation("orgDonationsReceived", fields: [recipientId], references: [id])
+  amount           Decimal       @db.Decimal(12, 2)
+  currency         String        @default("USD")
+  date             DateTime
+  sourceFilingId   String?
+  employer         String?
+  occupation       String?
+  address          String?
+  sourceDocumentId String?
+  sourceDocument   Document?     @relation("donationDoc", fields: [sourceDocumentId], references: [id])
+
+  @@index([donorPersonId])
+  @@index([donorOrgId])
+  @@index([recipientId])
+  @@index([date])
+}
+
+model VendorPayment {
+  id               String       @id @default(cuid())
+  payerId          String
+  payer            Organization @relation(fields: [payerId], references: [id])
+  vendorName       String
+  amount           Decimal      @db.Decimal(12, 2)
+  date             DateTime
+  purpose          String?
+  sourceDocumentId String?
+  sourceDocument   Document?    @relation("vendorPaymentDoc", fields: [sourceDocumentId], references: [id])
+
+  @@index([payerId])
+  @@index([date])
+}
+
+model Ownership {
+  id               String        @id @default(cuid())
+  ownerPersonId    String?
+  ownerPerson      Person?       @relation("personOwnership", fields: [ownerPersonId], references: [id])
+  ownerOrgId       String?
+  ownerOrg         Organization? @relation("orgOwnership", fields: [ownerOrgId], references: [id])
+  assetType        String // real_property | business | security | other
+  description      String
+  acquiredAt       DateTime?
+  disposedAt       DateTime?
+  sourceDocumentId String?
+  sourceDocument   Document?     @relation("ownershipDoc", fields: [sourceDocumentId], references: [id])
+}
+
+// -- Legal ------------------------------------------------------------------
+
+model CourtCase {
+  id              String   @id @default(cuid())
+  docketNumber    String
+  courtOcdId      String
+  caseType        String // civil | criminal | federal | bankruptcy | appellate
+  filedAt         DateTime?
+  closedAt        DateTime?
+  caption         String?
+
+  parties         CourtCaseParty[]
+  sourceDocuments Document[]       @relation("caseDoc")
+
+  @@unique([docketNumber, courtOcdId])
+}
+
+model CourtCaseParty {
+  id       String    @id @default(cuid())
+  caseId   String
+  case     CourtCase @relation(fields: [caseId], references: [id])
+  personId String?
+  person   Person?   @relation(fields: [personId], references: [id])
+  role     String // plaintiff | defendant | petitioner | respondent | attorney | judge
+
+  @@index([caseId])
+  @@index([personId])
+}
+
+// -- Documents, chunks, claims ----------------------------------------------
+
+model Document {
+  id           String    @id @default(cuid())
+  sourceUrl    String
+  archivedUrl  String?
+  gcsPath      String?
+  docType      String // pdf | html | video | transcript | social_post | hearing_transcript | rss_article
+  title        String?
+  publishedAt  DateTime?
+  collectedAt  DateTime  @default(now())
+  sourceSystem String // fec | la_ethics | courtlistener | gdelt | nola_council | bluesky | rss | etc.
+  hash         String    @unique
+  textContent  String?   @db.Text
+  metadata     Json?
+
+  chunks         DocumentChunk[]
+  donations      Donation[]      @relation("donationDoc")
+  vendorPayments VendorPayment[] @relation("vendorPaymentDoc")
+  ownerships     Ownership[]     @relation("ownershipDoc")
+  courtCases     CourtCase[]     @relation("caseDoc")
+  claims         Claim[]         @relation("claimDoc")
+
+  @@index([sourceSystem])
+  @@index([publishedAt])
+}
+
+model DocumentChunk {
   id            String   @id @default(cuid())
-  meetingDate   DateTime
-  title         String
-  slug          String   @unique
-  rawTranscript String?  @db.Text
-  summary       String?  @db.Text
-  keyDecisions  Json?
-  storageUrl    String?
-  status        String   @default("pending")
-  createdAt     DateTime @default(now())
+  documentId    String
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIndex    Int
+  text          String   @db.Text
+  contextPrefix String   @db.Text
+  pageNumber    Int?
+  charStart     Int?
+  charEnd       Int?
+  // Added in the initial migration via raw SQL (Prisma doesn't natively support pgvector):
+  //   embedding vector(384)
+  //   tsv       tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED
 
-  @@map("council_meetings")
+  @@index([documentId])
 }
 
-model OutageRecord {
-  id               String    @id @default(cuid())
-  recordedAt       DateTime  @default(now())
-  zipCode          String
-  neighborhood     String?
-  customersOut     Int
-  cause            String?
-  estimatedRestore DateTime?
+model Claim {
+  id               String        @id @default(cuid())
+  subjectPersonId  String?
+  subjectPerson    Person?       @relation("personClaims", fields: [subjectPersonId], references: [id])
+  subjectOrgId     String?
+  subjectOrg       Organization? @relation("orgClaims", fields: [subjectOrgId], references: [id])
+  predicate        String // attended | voted_for | donated_to | owns | was_charged_with | ...
+  objectText       String
+  confidence       Float
+  sourceDocumentId String
+  sourceDocument   Document      @relation("claimDoc", fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  charStart        Int?
+  charEnd          Int?
+  collectedAt      DateTime      @default(now())
 
-  @@map("outage_records")
+  @@index([subjectPersonId, predicate])
+  @@index([subjectOrgId, predicate])
+  @@index([sourceDocumentId])
 }
 
-model BudgetLineItem {
-  id          String @id @default(cuid())
-  fiscalYear  Int
-  department  String
-  fund        String
-  category    String
-  description String
-  amount      Int
+// -- Infrastructure (entity resolution, scraper observability, spend) ------
 
-  @@map("budget_line_items")
+model EntityMatch {
+  id              String    @id @default(cuid())
+  leftEntityType  String // person | organization
+  leftEntityId    String
+  rightEntityType String
+  rightEntityId   String
+  score           Float
+  status          String // auto_merged | needs_review | rejected
+  matchedAt       DateTime  @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+
+  @@index([status])
+  @@index([leftEntityType, leftEntityId])
+  @@index([rightEntityType, rightEntityId])
 }
 
-model DisplacementEvent {
-  id           String   @id @default(cuid())
-  eventType    String
-  address      String
-  neighborhood String
-  latitude     Float?
-  longitude    Float?
-  date         DateTime
-  details      Json?
-  source       String
-  createdAt    DateTime @default(now())
+model ScraperRun {
+  id              String    @id @default(cuid())
+  scraperName     String
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  status          String // running | success | partial | failed
+  recordsFetched  Int       @default(0)
+  recordsUpserted Int       @default(0)
+  errorCount      Int       @default(0)
+  errorDetails    Json?
 
-  @@map("displacement_events")
+  @@index([scraperName, startedAt])
 }
 
-model FloodPrediction {
-  id          String   @id @default(cuid())
-  area        String
-  riskLevel   String
-  predictedAt DateTime @default(now())
-  validUntil  DateTime
-  rainfallMm  Float?
-  pumpStatus  Json?
-  source      String
+model ApiSpendLog {
+  id                String   @id @default(cuid())
+  loggedAt          DateTime @default(now())
+  service           String // claude_sonnet | claude_haiku | documentai | gcs | cloud_sql | cloud_run | embed | other
+  operation         String // brain_interactive | brain_dossier | ingest_contextual_prefix | ingest_claim_extract | ocr | ...
+  inputTokens       Int?
+  cachedInputTokens Int?
+  outputTokens      Int?
+  pagesProcessed    Int?
+  costUsd           Decimal  @db.Decimal(10, 5)
+  metadata          Json?
 
-  @@map("flood_predictions")
-}
-
-model ForumPost {
-  id          String   @id @default(cuid())
-  title       String
-  body        String   @db.Text
-  authorName  String
-  authorEmail String?
-  votes       Int      @default(0)
-  status      String   @default("open")
-  createdAt   DateTime @default(now())
-
-  @@map("forum_posts")
-}
-
-model Infographic {
-  id          String    @id @default(cuid())
-  title       String
-  caption     String    @db.Text
-  imageUrl    String
-  tweetText   String?   @db.Text
-  topic       String
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-
-  @@map("infographics")
+  @@index([loggedAt])
+  @@index([service, loggedAt])
+  @@index([operation, loggedAt])
 }
