@@ -1,0 +1,19 @@
+# Dark Horse entity-resolution Cloud Run Job.
+# Runs Splink (Fellegi-Sunter probabilistic linkage) over Person + Organization
+# tables nightly. See pipelines/entity-resolution/splink_job.py.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    build-essential \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY pipelines/entity-resolution/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY pipelines/entity-resolution/ ./
+
+CMD ["python", "splink_job.py"]

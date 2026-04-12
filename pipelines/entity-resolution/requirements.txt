@@ -1,0 +1,4 @@
+psycopg2-binary==2.9.10
+splink==4.0.7
+duckdb==1.1.3
+pandas==2.2.3

@@ -1,0 +1,324 @@
+/**
+ * Tool handlers for the brain's Claude tool-use loop. Each handler is a
+ * Postgres query (via Prisma or raw SQL) returning JSON-serializable data
+ * the LLM can reason about.
+ *
+ * Hybrid search (vector + BM25) uses pgvector's <=> cosine-distance operator
+ * combined with Postgres FTS `tsv @@ websearch_to_tsquery`, merged by a
+ * simple reciprocal-rank-fusion.
+ */
+
+import { prisma } from "../db";
+import { embedSingle, toVectorLiteral } from "../ingest/embed";
+
+export async function searchPeople(args: {
+  query?: string;
+  officeOcdId?: string;
+  jurisdictionOcdId?: string;
+  limit?: number;
+}) {
+  const limit = args.limit ?? 20;
+  const rows = await prisma.person.findMany({
+    where: {
+      ...(args.query
+        ? {
+            OR: [
+              { familyName: { contains: args.query, mode: "insensitive" } },
+              { givenName: { contains: args.query, mode: "insensitive" } },
+              { aliases: { has: args.query } },
+            ],
+          }
+        : {}),
+    },
+    take: limit,
+    select: {
+      id: true,
+      givenName: true,
+      middleName: true,
+      familyName: true,
+      suffix: true,
+      aliases: true,
+      party: true,
+      ocdId: true,
+      wikidataQid: true,
+      fecCandidateId: true,
+    },
+    orderBy: { familyName: "asc" },
+  });
+  return { results: rows, count: rows.length };
+}
+
+export async function getPerson(args: { personId: string }) {
+  const person = await prisma.person.findUnique({
+    where: { id: args.personId },
+    include: {
+      terms: { include: { post: { include: { jurisdiction: true } } } },
+      candidacies: {
+        include: { election: true, post: { include: { jurisdiction: true } } },
+      },
+      memberships: { include: { organization: true } },
+    },
+  });
+  return person;
+}
+
+export async function searchDocuments(args: {
+  query: string;
+  personId?: string;
+  sinceDate?: string;
+  sourceSystem?: string;
+  limit?: number;
+}) {
+  const limit = args.limit ?? 10;
+  const queryEmbedding = await embedSingle(args.query);
+  const vector = toVectorLiteral(queryEmbedding);
+
+  // Hybrid: vector cosine distance + FTS rank, merged 50/50.
+  const since = args.sinceDate ? new Date(args.sinceDate) : null;
+  const sourceSystem = args.sourceSystem ?? null;
+
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      document_id: string;
+      chunk_index: number;
+      text: string;
+      page_number: number | null;
+      title: string | null;
+      source_url: string;
+      source_system: string;
+      published_at: Date | null;
+      vector_score: number;
+      fts_score: number;
+    }>
+  >`
+    WITH vec AS (
+      SELECT c.id, c."documentId", c."chunkIndex", c.text, c."pageNumber",
+             (1 - (c.embedding <=> ${vector}::vector)) AS vector_score,
+             0::float AS fts_score
+      FROM "DocumentChunk" c
+      WHERE c.embedding IS NOT NULL
+      ORDER BY c.embedding <=> ${vector}::vector
+      LIMIT 50
+    ),
+    fts AS (
+      SELECT c.id, c."documentId", c."chunkIndex", c.text, c."pageNumber",
+             0::float AS vector_score,
+             ts_rank_cd(c.tsv, websearch_to_tsquery('english', ${args.query})) AS fts_score
+      FROM "DocumentChunk" c
+      WHERE c.tsv @@ websearch_to_tsquery('english', ${args.query})
+      ORDER BY fts_score DESC
+      LIMIT 50
+    ),
+    combined AS (
+      SELECT id, "documentId", "chunkIndex", text, "pageNumber",
+             SUM(vector_score) AS vector_score,
+             SUM(fts_score) AS fts_score
+      FROM (SELECT * FROM vec UNION ALL SELECT * FROM fts) u
+      GROUP BY id, "documentId", "chunkIndex", text, "pageNumber"
+    )
+    SELECT c.id, c."documentId" AS document_id, c."chunkIndex" AS chunk_index,
+           c.text, c."pageNumber" AS page_number,
+           d.title, d."sourceUrl" AS source_url, d."sourceSystem" AS source_system,
+           d."publishedAt" AS published_at,
+           c.vector_score, c.fts_score
+    FROM combined c
+    JOIN "Document" d ON d.id = c."documentId"
+    WHERE (${since}::timestamp IS NULL OR d."publishedAt" >= ${since})
+      AND (${sourceSystem}::text IS NULL OR d."sourceSystem" = ${sourceSystem})
+    ORDER BY (c.vector_score * 0.5 + c.fts_score * 0.5) DESC
+    LIMIT ${limit}
+  `;
+
+  return {
+    results: rows.map((r) => ({
+      chunkId: r.id,
+      documentId: r.document_id,
+      chunkIndex: r.chunk_index,
+      text: r.text,
+      pageNumber: r.page_number,
+      title: r.title,
+      sourceUrl: r.source_url,
+      sourceSystem: r.source_system,
+      publishedAt: r.published_at?.toISOString(),
+      score: Number(r.vector_score) * 0.5 + Number(r.fts_score) * 0.5,
+    })),
+  };
+}
+
+export async function getDocument(args: { documentId: string }) {
+  const document = await prisma.document.findUnique({
+    where: { id: args.documentId },
+    select: {
+      id: true,
+      sourceUrl: true,
+      archivedUrl: true,
+      docType: true,
+      title: true,
+      publishedAt: true,
+      sourceSystem: true,
+      textContent: true,
+    },
+  });
+  return document;
+}
+
+export async function searchClaims(args: {
+  subjectPersonId: string;
+  predicate?: string;
+  limit?: number;
+}) {
+  const rows = await prisma.claim.findMany({
+    where: {
+      subjectPersonId: args.subjectPersonId,
+      ...(args.predicate ? { predicate: args.predicate } : {}),
+    },
+    take: args.limit ?? 50,
+    orderBy: { collectedAt: "desc" },
+    include: {
+      sourceDocument: {
+        select: { title: true, sourceUrl: true, sourceSystem: true, publishedAt: true },
+      },
+    },
+  });
+  return rows.map((c) => ({
+    id: c.id,
+    predicate: c.predicate,
+    objectText: c.objectText,
+    confidence: c.confidence,
+    source: {
+      documentId: c.sourceDocumentId,
+      title: c.sourceDocument?.title,
+      sourceUrl: c.sourceDocument?.sourceUrl,
+      sourceSystem: c.sourceDocument?.sourceSystem,
+      publishedAt: c.sourceDocument?.publishedAt?.toISOString(),
+      charStart: c.charStart,
+      charEnd: c.charEnd,
+    },
+  }));
+}
+
+export async function getDonations(args: {
+  personId?: string;
+  committeeId?: string;
+  direction: "given" | "received";
+  minAmount?: number;
+  sinceDate?: string;
+  limit?: number;
+}) {
+  const limit = args.limit ?? 100;
+  const since = args.sinceDate ? new Date(args.sinceDate) : undefined;
+  const minAmount = args.minAmount;
+
+  if (args.direction === "given") {
+    return prisma.donation.findMany({
+      where: {
+        OR: [
+          args.personId ? { donorPersonId: args.personId } : {},
+          args.committeeId ? { donorOrgId: args.committeeId } : {},
+        ].filter((w) => Object.keys(w).length > 0),
+        ...(minAmount ? { amount: { gte: minAmount } } : {}),
+        ...(since ? { date: { gte: since } } : {}),
+      },
+      take: limit,
+      orderBy: { date: "desc" },
+      include: { recipient: true },
+    });
+  }
+
+  return prisma.donation.findMany({
+    where: {
+      recipientId: args.committeeId ?? "__none__",
+      ...(minAmount ? { amount: { gte: minAmount } } : {}),
+      ...(since ? { date: { gte: since } } : {}),
+    },
+    take: limit,
+    orderBy: { date: "desc" },
+    include: { donorPerson: true, donorOrg: true },
+  });
+}
+
+export async function getCourtCases(args: { personId: string; caseType?: string }) {
+  return prisma.courtCaseParty.findMany({
+    where: {
+      personId: args.personId,
+      ...(args.caseType ? { case: { caseType: args.caseType } } : {}),
+    },
+    include: { case: true },
+  });
+}
+
+export async function getNews(args: { personId: string; sinceDate?: string; limit?: number }) {
+  const person = await prisma.person.findUnique({
+    where: { id: args.personId },
+    select: { givenName: true, familyName: true, aliases: true },
+  });
+  if (!person) return { results: [] };
+
+  const query = `${person.givenName} ${person.familyName}`;
+  return searchDocuments({
+    query,
+    sinceDate: args.sinceDate,
+    sourceSystem: "rss",
+    limit: args.limit ?? 20,
+  });
+}
+
+export async function getHearings(args: { personId: string; sinceDate?: string; limit?: number }) {
+  const person = await prisma.person.findUnique({
+    where: { id: args.personId },
+    select: { givenName: true, familyName: true },
+  });
+  if (!person) return { results: [] };
+  const query = `${person.givenName} ${person.familyName}`;
+  const results = await prisma.document.findMany({
+    where: {
+      docType: { in: ["hearing_transcript", "transcript", "video"] },
+      textContent: { contains: query, mode: "insensitive" },
+      ...(args.sinceDate ? { publishedAt: { gte: new Date(args.sinceDate) } } : {}),
+    },
+    take: args.limit ?? 10,
+    orderBy: { publishedAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      sourceUrl: true,
+      sourceSystem: true,
+      publishedAt: true,
+    },
+  });
+  return { results };
+}
+
+export async function getPublicOpinion(args: {
+  personId: string;
+  sinceDate?: string;
+  sources?: string[];
+}) {
+  const person = await prisma.person.findUnique({
+    where: { id: args.personId },
+    select: { givenName: true, familyName: true, aliases: true },
+  });
+  if (!person) return { results: [] };
+  const query = `${person.givenName} ${person.familyName}`;
+  const sources = args.sources ?? ["bluesky", "social_post", "forum"];
+  return prisma.document.findMany({
+    where: {
+      sourceSystem: { in: sources },
+      textContent: { contains: query, mode: "insensitive" },
+      ...(args.sinceDate ? { publishedAt: { gte: new Date(args.sinceDate) } } : {}),
+    },
+    take: 30,
+    orderBy: { publishedAt: "desc" },
+  });
+}
+
+export async function webSearch(args: { query: string }) {
+  // Stub — a real implementation would call a web search API (SerpAPI, Brave,
+  // Bing until Aug 2025). The brain is instructed to use this sparingly.
+  return {
+    note: "web_search is not yet wired to a provider. Prefer local tools.",
+    query: args.query,
+    results: [],
+  };
+}
