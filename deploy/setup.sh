@@ -1,18 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-# NOLA Pulse — GCP Infrastructure Setup
+# Dark Horse — GCP Infrastructure Setup
 # Run once to set up the GCP project infrastructure.
+# NOTE: Most of this was already run during the Nola Pulse era.
+# The bootstrap for Dark Horse is documented in docs/deploy.md.
 
 PROJECT_ID="nola-ai-innovation"
 REGION="us-south1"
-SERVICE_NAME="nola-pulse"
+SERVICE_NAME="dark-horse"
 DB_INSTANCE="nola-pulse-db"
 DB_NAME="nolapulse"
 DB_USER="nolapulse"
-ARTIFACT_REPO="nola-pulse-repo"
+ARTIFACT_REPO="dark-horse-repo"
 
-echo "=== NOLA Pulse GCP Setup ==="
+echo "=== Dark Horse GCP Setup ==="
 echo "Project: $PROJECT_ID"
 echo "Region: $REGION"
 echo ""
@@ -74,10 +76,6 @@ echo -n "$DATABASE_URL" | gcloud secrets create DATABASE_URL \
   --data-file=- --project=$PROJECT_ID \
   2>/dev/null || echo "Secret DATABASE_URL already exists"
 
-echo -n "$(openssl rand -base64 32)" | gcloud secrets create AUTH_SECRET \
-  --data-file=- --project=$PROJECT_ID \
-  2>/dev/null || echo "Secret AUTH_SECRET already exists"
-
 echo -n "$(openssl rand -base64 32)" | gcloud secrets create CRON_SECRET \
   --data-file=- --project=$PROJECT_ID \
   2>/dev/null || echo "Secret CRON_SECRET already exists"
@@ -99,14 +97,15 @@ SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \
 if [ -n "$SERVICE_URL" ]; then
   CRON_SECRET=$(gcloud secrets versions access latest --secret=CRON_SECRET --project=$PROJECT_ID)
 
-  gcloud scheduler jobs create http daily-article \
+  # Nightly scraper run (RSS + GDELT)
+  gcloud scheduler jobs create http nightly-scrapers \
     --location=$REGION \
     --schedule="0 5 * * *" \
-    --uri="${SERVICE_URL}/api/cron/daily-article" \
+    --uri="${SERVICE_URL}/api/jobs/scrapers" \
     --http-method=POST \
     --headers="Authorization=Bearer ${CRON_SECRET}" \
     --project=$PROJECT_ID \
-    2>/dev/null || echo "Job daily-article already exists"
+    2>/dev/null || echo "Job nightly-scrapers already exists"
 
   echo "Cloud Scheduler jobs created."
 else
@@ -118,5 +117,7 @@ echo "=== Setup Complete ==="
 echo "Next steps:"
 echo "  1. Set ANTHROPIC_API_KEY secret (see above)"
 echo "  2. Build and deploy: gcloud builds submit --config=cloudbuild.yaml --project=$PROJECT_ID"
-echo "  3. Run database migrations against Cloud SQL"
-echo "  4. Set up Cloud Scheduler jobs (if not done above)"
+echo "  3. Run database migrations: npx prisma migrate deploy"
+echo "  4. Seed the database: npx prisma db seed"
+echo "  5. Set up Cloud Scheduler jobs (if not done above)"
+echo "  6. Enable IAP and grant access (see docs/deploy.md steps 8-9)"

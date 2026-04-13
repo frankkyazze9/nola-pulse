@@ -67,15 +67,17 @@ Meta Content Library and TikTok Research APIs are off the table — both require
 *Goal: working system with real data flowing, accessible to Frank via CLI and API.*
 
 **Frank (infra — can't be automated):**
-- [ ] Create `dark-horse-repo` Artifact Registry
-- [ ] Provision Cloud SQL (db-f1-micro) + apply migration + run seed
-- [ ] Create GCS bucket (`dark-horse-data`)
-- [ ] Create Document AI OCR processor
-- [ ] Deploy `dark-horse-embed` Cloud Run service (BGE-small-en-v1.5)
+- [x] Create `dark-horse-repo` Artifact Registry (us-south1)
+- [x] Provision Cloud SQL (db-f1-micro, instance: `nola-pulse-db`) + apply migration + run seed
+- [x] Create GCS bucket (`dark-horse-docs`)
+- [x] Create Document AI OCR processor (`projects/845570509325/locations/us/processors/5af64dddbe7314c0`)
+- [x] Deploy `dark-horse` Cloud Run service (`https://dark-horse-lo7wkq5zya-vp.a.run.app`)
+- [ ] Deploy `dark-horse-embed` Cloud Run service (BGE-small-en-v1.5) — deploying
 - [ ] Set up IAP on Cloud Run service
-- [ ] Set secrets in Secret Manager (DATABASE_URL, ANTHROPIC_API_KEY, CRON_SECRET)
+- [x] Set secrets in Secret Manager (DATABASE_URL, ANTHROPIC_API_KEY, CRON_SECRET)
 - [ ] Push 3 local commits to origin, verify Cloud Build triggers
 - [ ] Register for FEC API key (free, email APIinfo@fec.gov for 7200 req/hr)
+- [ ] Clean up stale Nola Pulse secrets (see docs/deploy.md step 7)
 
 **Code:**
 - [ ] Cloud Scheduler cron jobs: nightly RSS + GDELT scraper triggers

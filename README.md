@@ -61,11 +61,17 @@ That's the entire auth model. No user table, no sign-up flow, no password reset 
 
 ## Secrets
 
-Production secrets live in Google Secret Manager in the `nola-ai-innovation` GCP project. Cloud Build injects them at deploy time via `--set-secrets` in `cloudbuild.yaml`:
+Production secrets live in Google Secret Manager in the `nola-ai-innovation` GCP project (845570509325). Cloud Build injects them at deploy time via `--set-secrets` in `cloudbuild.yaml`:
 
-- `DATABASE_URL` — Cloud SQL connection string
+- `DATABASE_URL` — Cloud SQL connection string (instance: `nola-pulse-db`, database: `nolapulse`, user: `nolapulse`)
 - `ANTHROPIC_API_KEY` — Anthropic API key
 - `CRON_SECRET` — shared secret for Cloud Scheduler calls
+- `TWITTER_API_KEY` — Twitter/X API key (legacy; migrating to SociaVault in Phase 5)
+- `TWITTER_API_SECRET` — Twitter/X API secret
+- `TWITTER_ACCESS_TOKEN` — Twitter/X access token
+- `TWITTER_ACCESS_SECRET` — Twitter/X access secret
+
+**Stale secrets (cleanup candidates):** `ADMIN_PASSWORD`, `AUTH_SECRET`, `NEXTAUTH_URL`, `AUTH_TRUST_HOST`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS` — left over from the Nola Pulse auth system. Safe to delete once Dark Horse is confirmed stable.
 
 IAP, Document AI, GCS, Cloud SQL, and the embedding service all use the Cloud Run service account for authentication — no API-key secrets for them.
 
@@ -74,22 +80,34 @@ IAP, Document AI, GCS, Cloud SQL, and the embedding service all use the Cloud Ru
 ```
 app/               Next.js App Router pages and API routes
 components/        Shared React components (populated in Phase 8)
+data/              Static data files (seed CSV/JSON)
+deploy/            Infrastructure setup scripts (setup.sh)
 lib/
   brain/           The Claude tool-use loop + tool implementations
   claude/          Batch API wrapper, prompt caching, spend logging
   ingest/          Document pipeline
   scraper/         Shared scraper base
+  claude.ts        Claude client wrapper
   db.ts            Prisma client singleton
-  spend.ts         ApiSpendLog helper
-  ocd.ts           Open Civic Data ID helpers
   ftm.ts           FollowTheMoney serialization helpers
+  gcs.ts           GCS upload/download helpers
+  ocd.ts           Open Civic Data ID helpers
+  spend.ts         ApiSpendLog helper
+  wayback.ts       Wayback Machine archival helper
 pipelines/
-  scrapers/        One directory per scraper
-  entity-resolution/  Splink + DuckDB Python job
-  transcribe/      Whisper transcription job
+  embed/           Self-hosted BGE-small embedding service (Dockerfile.embed)
+  entity-resolution/  Splink + DuckDB Python job (Dockerfile.entity-res)
+  scrapers/        One directory per scraper (bluesky, fec, gdelt,
+                     la-ethics-bootstrap, legiscan-la, nola-council-granicus,
+                     nola-news-rss)
 prisma/            Schema, migrations, seed data
-scripts/           CLI scripts (brain-cli, test-dossier, seed-sanity)
+public/            Static assets
+scripts/           CLI scripts (brain-cli)
+docs/              deploy.md, ROADMAP.md
 .claude/skills/    Project-specific Claude Code skills
+Dockerfile         Main Next.js app container
+Dockerfile.embed   Embedding service container
+Dockerfile.entity-res  Entity resolution job container
 ```
 
 ## Skills
