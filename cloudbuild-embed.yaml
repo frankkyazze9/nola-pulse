@@ -44,5 +44,6 @@ steps:
       - '--concurrency'
       - '10'
 
+timeout: 2400s
 options:
   logging: CLOUD_LOGGING_ONLY
