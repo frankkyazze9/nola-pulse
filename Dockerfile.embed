@@ -1,0 +1,22 @@
+# Dark Horse embedding server — BGE-small-en-v1.5 (384 dim).
+# Bakes the model into the image at build time so cold starts are fast.
+# Target: ~800 MB image, ~400 MB RAM, scale-to-zero on Cloud Run.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY pipelines/embed/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download model at build time so it's baked into the image
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
+
+COPY pipelines/embed/server.py ./
+
+EXPOSE 8080
+CMD ["python", "server.py"]
