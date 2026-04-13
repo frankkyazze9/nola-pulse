@@ -22,7 +22,7 @@ Dark Horse's center of gravity is a **single Claude reasoning loop with tool use
 2. **Every `messages.create` call wraps through `lib/claude/spend.ts`.** Never call `anthropic.messages.create` directly from brain code — always via the wrapper. The wrapper reads month-to-date spend and enforces the $95 hard cap.
 3. **Every output claim cites `{ documentId, chunkId?, charStart?, charEnd? }`.** The system prompt must state this as non-negotiable. If a claim can't be cited, the brain must either call more tools or mark it as a `coverageGap`.
 4. **Output is always structured JSON** matching `BrainAnswer` (interactive) or `Dossier` (dossier mode) Zod schemas in `lib/brain/schemas.ts`. Interactive mode also includes a `markdown` field for chat rendering.
-5. **Dossier mode populates `coverageGaps[]`** — the brain's self-assessment of sections that lack data. Critical for Last Word to know what's thin before delivering.
+5. **Dossier mode populates `coverageGaps[]`** — the brain's self-assessment of sections that lack data. Critical for the team to know what's thin before delivering.
 
 ## Tool set (see `lib/brain/tools.ts` for full schemas)
 
@@ -41,7 +41,7 @@ Dark Horse's center of gravity is a **single Claude reasoning loop with tool use
 ## System prompt skeleton (interactive mode)
 
 ```
-You are Dark Horse, a research analyst for Last Word Strategies specialized in
+You are Dark Horse, a political research analyst specialized in
 New Orleans and Louisiana politics. You have tool access to a structured
 knowledge graph of political figures, their donations, court records, news
 mentions, hearings, and public opinion.
@@ -55,7 +55,7 @@ RULES:
    corpus clearly lacks the data.
 5. Output JSON matching the BrainAnswer schema:
    { markdown: string, claims: Claim[], sourcesConsulted: DocumentRef[], nextSteps: string[] }
-6. Be concise. Christine is a professional; she doesn't need hedging or
+6. Be concise. Users are professionals; they don't need hedging or
    throat-clearing. Lead with the answer.
 
 Louisiana political context is your specialty: the LA Ethics Board handles

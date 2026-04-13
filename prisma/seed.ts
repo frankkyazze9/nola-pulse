@@ -1,8 +1,8 @@
 /**
  * Dark Horse seed data.
  *
- * Loads Louisiana jurisdictions (Open Civic Data IDs) and the Posts Last Word
- * Strategies cares about for opposition research. Idempotent — safe to re-run.
+ * Loads Louisiana jurisdictions (Open Civic Data IDs) and the Posts Dark Horse
+ * tracks for opposition research. Idempotent — safe to re-run.
  *
  * Run: `npx prisma db seed`
  */
@@ -244,7 +244,7 @@ async function main() {
   }
   console.log(`  upserted ${JURISDICTIONS.length} jurisdictions`);
 
-  console.log("Seeding Posts Last Word cares about...");
+  console.log("Seeding Posts Dark Horse tracks...");
   for (const p of POSTS) {
     const jurisdictionId = jurisdictionIdByOcdId.get(p.jurisdictionOcdId);
     if (!jurisdictionId) {

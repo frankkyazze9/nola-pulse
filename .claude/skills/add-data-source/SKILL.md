@@ -142,7 +142,7 @@ gcloud scheduler jobs create http scraper-<name>-nightly \
 
 ## 7 — If the scraper exposes a new query type, add a brain tool
 
-If the new source enables queries Christine can't already ask (e.g. "who was at this hearing" becomes answerable only after adding `scraper-hearings-attendance`), add a matching tool to `lib/brain/tools.ts`:
+If the new source enables queries users can't already ask (e.g. "who was at this hearing" becomes answerable only after adding `scraper-hearings-attendance`), add a matching tool to `lib/brain/tools.ts`:
 
 ```typescript
 get_hearing_attendees: {

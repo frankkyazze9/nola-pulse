@@ -8,7 +8,7 @@ This doc covers the one-time bootstrap and the day-to-day operations.
 
 These steps run **once** when you're standing up Dark Horse from the Nola Pulse base. Some are manual (gcloud / console) because they provision infrastructure the app depends on.
 
-**Status as of 2026-04-11:** Steps 1-6 are DONE. Steps 7-8 (IAP) are pending. Step 9 is DONE. Step 10 is pending Frank's confirmation.
+**Status as of 2026-04-11:** Steps 1-6 are DONE. Steps 7-8 (IAP) are pending. Step 9 is DONE. Step 10 is pending confirmation.
 
 ### 1. Create the Artifact Registry repo -- DONE
 
@@ -112,28 +112,28 @@ gcloud iap settings set settings.yaml \
 ### 9. Grant access to users -- PENDING (blocked on step 8)
 
 ```bash
-# Frank
+# Admin
 gcloud iap web add-iam-policy-binding \
   --resource-type=cloud-run \
   --service=dark-horse \
   --region=us-south1 \
-  --member=user:frankkyazze@gmail.com \
+  --member=user:admin@example.com \
   --role=roles/iap.httpsResourceAccessor
 
-# Christine (Last Word Strategies)
+# Team member
 gcloud iap web add-iam-policy-binding \
   --resource-type=cloud-run \
   --service=dark-horse \
   --region=us-south1 \
-  --member=user:<christine-email> \
+  --member=user:<team-member-email> \
   --role=roles/iap.httpsResourceAccessor
 ```
 
-Add more Last Word staff the same way.
+Add more Dark Horse team members the same way.
 
 ### 10. Decommission `nola-pulse` -- PENDING
 
-Once `dark-horse` is stable and Frank confirms, delete the old service:
+Once `dark-horse` is stable and confirmed, delete the old service:
 
 ```bash
 gcloud run services delete nola-pulse --region=us-south1 --project=nola-ai-innovation
@@ -151,7 +151,7 @@ Manual deploy:
 gcloud builds submit --config=cloudbuild.yaml --project=nola-ai-innovation
 ```
 
-### Grant access to a new Last Word staffer
+### Grant access to a new team member
 ```bash
 gcloud iap web add-iam-policy-binding \
   --resource-type=cloud-run \

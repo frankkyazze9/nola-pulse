@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Dark Horse",
-  description: "Internal political research tool for Last Word Strategies.",
+  description: "Internal political research tool.",
 };
 
 export default function RootLayout({

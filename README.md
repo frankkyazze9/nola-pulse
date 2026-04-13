@@ -1,8 +1,8 @@
 # Dark Horse
 
-Internal political research tool for [Last Word Strategies](https://lastwordstrategies.com). Deep-research "brain" that reasons over a Louisiana / New Orleans political knowledge graph — campaign finance, court records, public hearings, news coverage, public opinion — and returns sourced analytical synthesis for candidates and seat-holders at every level (judges, city council, state reps, DAs, sheriffs, mayors).
+Internal political research tool. Deep-research "brain" that reasons over a Louisiana / New Orleans political knowledge graph — campaign finance, court records, public hearings, news coverage, public opinion — and returns sourced analytical synthesis for candidates and seat-holders at every level (judges, city council, state reps, DAs, sheriffs, mayors).
 
-**This is an internal tool.** There is no public site, no marketing page, and no anonymous access. Every page is gated behind Google IAP and restricted to a short allowlist of Last Word staff.
+**This is an internal tool.** There is no public site, no marketing page, and no anonymous access. Every page is gated behind Google IAP and restricted to a short allowlist of Dark Horse team members.
 
 Built on top of the former "Nola Pulse" civic-intelligence platform — see git history prior to the rename for the earlier product.
 
@@ -46,7 +46,7 @@ Cloud Build watches the `main` branch on GitHub. Pushing triggers a build of the
 gcloud builds submit --config=cloudbuild.yaml --project=nola-ai-innovation
 ```
 
-## Granting access to a new Last Word staffer
+## Granting access to a new team member
 
 ```bash
 gcloud iap web add-iam-policy-binding \

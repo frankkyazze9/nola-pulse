@@ -5,7 +5,7 @@ description: Standard workflow for adding a new political candidate to Dark Hors
 
 # Adding a candidate to Dark Horse
 
-This is the end-to-end workflow for onboarding a new Louisiana political figure into Dark Horse. Follow it when Christine says *"get me everything we have on Judge X"* or *"start a file on this new council candidate."*
+This is the end-to-end workflow for onboarding a new Louisiana political figure into Dark Horse. Follow it when a user says *"get me everything we have on Judge X"* or *"start a file on this new council candidate."*
 
 ## Step 1 — Create or look up the Person entity
 
@@ -59,14 +59,14 @@ The dossier JSON includes `coverageGaps[]` — sections the brain couldn't fill.
 - **Pre-2021 state-level campaign finance** — Accountability Project data stops in 2021; LA Ethics live scrape picks up from 2022.
 - **Pre-Bluesky social media** — X API is pay-per-use, Meta is locked. Public statements from 2020-2023 may need manual curation.
 
-Hand coverage gaps to Christine before delivering — "here's what we have, here's what we don't" is a professional norm.
+Hand coverage gaps to the requesting user before delivering — "here's what we have, here's what we don't" is a professional norm.
 
 ## Step 6 — Iterate
 
 For each gap:
 - Is there a source we haven't scraped? → add it via `add-data-source` skill.
 - Is there a scraper that failed? → check `ScraperRun` for error details.
-- Is the data simply unavailable publicly? → note the gap, Christine can decide whether to FOIA.
+- Is the data simply unavailable publicly? → note the gap, the team can decide whether to FOIA.
 
 ## Canonical predicates for claims
 

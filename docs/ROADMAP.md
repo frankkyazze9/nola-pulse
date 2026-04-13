@@ -2,13 +2,13 @@
 
 Last updated: 2026-04-13
 
-Dark Horse is an OSINT intelligence platform for political research, investigations, and influencer identification — built for Last Word Strategies. The "brain" is a Claude reasoning loop over a growing knowledge graph of people, organizations, documents, social media, and the connections between them.
+Dark Horse is an OSINT intelligence platform for political research, investigations, and influencer identification. The "brain" is a Claude reasoning loop over a growing knowledge graph of people, organizations, documents, social media, and the connections between them.
 
 ---
 
 ## Vision
 
-A digital private-investigator toolkit that Christine and her team can use to:
+A digital private-investigator toolkit that the Dark Horse team can use to:
 
 1. **Investigate individuals and organizations** — politicians, donors, PACs, lobbyists, judges, anyone in the Louisiana political ecosystem. Surface connections, contradictions, money flows, and patterns.
 2. **Monitor the information landscape** — news, public hearings, court filings, social media. Know what's being said, by whom, and where sentiment is shifting.
@@ -26,7 +26,7 @@ A digital private-investigator toolkit that Christine and her team can use to:
 | Infrastructure | ~$25-30/mo | GCP billing alerts |
 | **Total** | **~$220-230/mo max** | Cost dashboard at `/admin/spend` |
 
-Frank wants full cost transparency. Every API call — LLM, social, OCR — logs to `ApiSpendLog` and surfaces on the admin spend dashboard.
+Full cost transparency is required. Every API call — LLM, social, OCR — logs to `ApiSpendLog` and surfaces on the admin spend dashboard.
 
 ---
 
@@ -38,7 +38,7 @@ Supplemented by two free official APIs:
 - **Facebook Ad Library API** — free, public, all political/issue ads. Highest-value free signal.
 - **Bluesky AT Protocol** — free, no API key, no rate cliff. LA political class is migrating there.
 
-Meta Content Library and TikTok Research APIs are off the table — both require nonprofit/academic affiliation that Last Word (for-profit consultancy) doesn't have.
+Meta Content Library and TikTok Research APIs are off the table — both require nonprofit/academic affiliation that Dark Horse (for-profit consultancy) doesn't have.
 
 **Priority order:** Instagram + Twitter/X first, then phase in TikTok + Facebook.
 
@@ -64,9 +64,9 @@ Meta Content Library and TikTok Research APIs are off the table — both require
 
 ## Phase 1: Go Live
 
-*Goal: working system with real data flowing, accessible to Frank via CLI and API.*
+*Goal: working system with real data flowing, accessible via CLI and API.*
 
-**Frank (infra — can't be automated):**
+**Infra (manual — can't be automated):**
 - [x] Create `dark-horse-repo` Artifact Registry (us-south1)
 - [x] Provision Cloud SQL (db-f1-micro, instance: `nola-pulse-db`) + apply migration + run seed
 - [x] Create GCS bucket (`dark-horse-docs`)
@@ -90,11 +90,11 @@ Meta Content Library and TikTok Research APIs are off the table — both require
 
 ## Phase 2: Brain Chat UI
 
-*Goal: Christine can ask the brain questions from a browser.*
+*Goal: users can ask the brain questions from a browser.*
 
 **Sprint 2.1 — Research chat interface (3-4 days)**
 - [ ] `/research` page — conversational chat with the brain
-- [ ] Streaming responses (SSE from `/api/brain/stream`) so Christine sees progress, not a 60s spinner
+- [ ] Streaming responses (SSE from `/api/brain/stream`) so users see progress, not a 60s spinner
 - [ ] Rendered markdown answers with clickable source citations (documentId links to source URL)
 - [ ] Conversation history — `Conversation` + `Message` Prisma models, sidebar list
 - [ ] Person quick-search bar — typeahead against `search_people`, selecting a person pre-fills context
@@ -103,13 +103,13 @@ Meta Content Library and TikTok Research APIs are off the table — both require
 - [ ] "Generate Dossier" button from person search or conversation
 - [ ] Dossier viewer — tabbed sections, sourced claims, coverage gaps highlighted
 - [ ] Dossier list page — all generated dossiers, searchable by person name
-- [ ] Mobile-responsive (Christine uses her phone)
+- [ ] Mobile-responsive (users may be on mobile)
 
 **No new API cost** — just UI over the existing brain.
 
 ## Phase 3: Admin & Observability
 
-*Goal: Frank can monitor system health and costs without SSH.*
+*Goal: admins can monitor system health and costs without SSH.*
 
 **Sprint 3.1 — Spend dashboard (1-2 days)**
 - [ ] `/admin/spend` — month-to-date total vs ceiling, donut chart by service (Claude, SociaVault, DocumentAI, etc.)
@@ -264,4 +264,4 @@ Meta Content Library and TikTok Research APIs are off the table — both require
 | 2026-04-13 | Meta Content Library | Not eligible (requires nonprofit/academic) |
 | 2026-04-13 | TikTok Research API | Not eligible (requires non-commercial research) |
 | 2026-04-13 | Budget ceiling | ~$100/mo LLM + ~$100/mo social + ~$30/mo infra = ~$230/mo max |
-| | Push to origin? | Pending Frank |
+| | Push to origin? | Pending |
