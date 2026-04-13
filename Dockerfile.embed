@@ -1,6 +1,6 @@
 # Dark Horse embedding server — BGE-small-en-v1.5 (384 dim).
-# Bakes the model into the image at build time so cold starts are fast.
 # Uses CPU-only PyTorch (~200MB vs 2.5GB CUDA) since Cloud Run is CPU-only.
+# Model downloads on first request (~30s cold start), then stays cached.
 
 FROM python:3.12-slim
 
@@ -8,13 +8,8 @@ WORKDIR /app
 
 COPY pipelines/embed/requirements.txt ./
 
-# Install CPU-only torch FIRST to avoid the 2.5GB CUDA download,
-# then the rest of the deps (sentence-transformers will reuse torch).
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
  && pip install --no-cache-dir -r requirements.txt
-
-# Download model at build time so it's baked into the image
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
 
 COPY pipelines/embed/server.py ./
 
