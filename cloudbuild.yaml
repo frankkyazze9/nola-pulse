@@ -31,12 +31,37 @@ steps:
       - '--port'
       - '8080'
       - '--allow-unauthenticated'
+      - '--timeout'
+      - '3600'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--concurrency'
+      - '40'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
       - '--set-secrets'
       - 'DATABASE_URL=DATABASE_URL:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,CRON_SECRET=CRON_SECRET:latest,ADMIN_PASSWORD=ADMIN_PASSWORD:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_WEBHOOK_SECRET=TELEGRAM_WEBHOOK_SECRET:latest,TELEGRAM_ALLOWED_USERS=TELEGRAM_ALLOWED_USERS:latest'
       - '--set-env-vars'
-      - 'GCP_PROJECT_ID=$PROJECT_ID,GCS_BUCKET=dark-horse-docs'
+      - 'GCP_PROJECT_ID=$PROJECT_ID,GCS_BUCKET=dark-horse-docs,EMBEDDING_SERVICE_URL=https://dark-horse-embed-lo7wkq5zya-vp.a.run.app,DOCUMENT_AI_PROCESSOR_ID=projects/845570509325/locations/us/processors/5af64dddbe7314c0'
       - '--add-cloudsql-instances'
       - 'nola-ai-innovation:us-south1:nola-pulse-db'
 
+  # Ensure allUsers has invoker (Cloud Build SA can't grant it via --allow-unauthenticated alone).
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'add-iam-policy-binding'
+      - 'dark-horse'
+      - '--region=us-south1'
+      - '--member=allUsers'
+      - '--role=roles/run.invoker'
+
+timeout: 1800s
 options:
   logging: CLOUD_LOGGING_ONLY

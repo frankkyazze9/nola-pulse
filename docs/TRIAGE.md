@@ -1,6 +1,8 @@
-# Dark Horse — Known Issues & Deficiencies
+# Dark Horse — Triage Log
 
-A living log of bugs, deficiencies, and tech debt surfaced during build. Each entry is structured to drop directly into a GitHub issue.
+Active bugs, deficiencies, and tech debt. Update status inline as items are worked.
+
+Status legend: `[ ]` open, `[~]` in progress, `[x]` resolved, `[-]` wontfix/deferred.
 
 Last updated: 2026-04-14
 
@@ -8,7 +10,18 @@ Last updated: 2026-04-14
 
 ## P0 — Critical
 
-### 1. Document pipeline creates orphan Documents when chunking/embedding fails
+### 0. [x] cloudbuild.yaml was missing EMBEDDING_SERVICE_URL / DOCUMENT_AI_PROCESSOR_ID
+
+**Resolved:** both added to `--set-env-vars` in cloudbuild.yaml.
+
+**Problem:** After the initial infra setup I ran `gcloud run services update --update-env-vars=EMBEDDING_SERVICE_URL=...` manually to wire the main app to the embed service. But cloudbuild.yaml only set `GCP_PROJECT_ID` and `GCS_BUCKET`. Every subsequent deploy (conversation memory, password auth, cases, projects, telegram bot) replaced the whole env var set, wiping EMBEDDING_SERVICE_URL and DOCUMENT_AI_PROCESSOR_ID. The ingest pipeline threw "EMBEDDING_SERVICE_URL not set" on every article silently (per-article catch in scrapers) — producing 70+ orphan Documents and zero chunks.
+
+**Lesson:** Anything set via `gcloud run services update --set-env-vars` is authoritative for that revision only. Next deploy wipes it unless `cloudbuild.yaml` also sets it.
+
+
+### 1. [x] Document pipeline creates orphan Documents when chunking/embedding fails
+
+**Resolved:** commit pending — deferred `Document.create` until after chunks + embeddings are ready, wrapped Document + chunk inserts in a `prisma.$transaction`. Claim extraction now runs outside the transaction with its own error handling (claim failures don't rollback the document).
 
 **Labels:** `bug`, `scraper`
 
@@ -59,7 +72,9 @@ await fetch(`${EMBED_URL}/embed`, { headers, ... });
 
 ---
 
-### 3. `--allow-unauthenticated` in cloudbuild.yaml doesn't actually apply `allUsers` binding
+### 3. [x] `--allow-unauthenticated` in cloudbuild.yaml doesn't actually apply `allUsers` binding
+
+**Resolved:** added explicit `gcloud run services add-iam-policy-binding allUsers` step to cloudbuild.yaml so every deploy enforces public access. Also fixed EMBEDDING_SERVICE_URL + DOCUMENT_AI_PROCESSOR_ID env vars (which were getting wiped by deploys because they weren't in cloudbuild.yaml), and added `--timeout=3600 --memory=1Gi` while we're at it.
 
 **Labels:** `bug`, `infra`
 
@@ -76,7 +91,9 @@ gcloud run services add-iam-policy-binding dark-horse \
 
 ## P1 — High priority
 
-### 4. Cloud Run request timeout must be set via cloudbuild.yaml, not defaults
+### 4. [x] Cloud Run request timeout must be set via cloudbuild.yaml, not defaults
+
+**Resolved:** rolled into the cloudbuild.yaml fix (#3). `--timeout=3600 --memory=1Gi --cpu=1 --concurrency=40 --max-instances=10` now in the deploy step.
 
 **Labels:** `infra`
 

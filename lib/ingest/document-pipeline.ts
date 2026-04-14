@@ -22,7 +22,7 @@ import { saveBuffer, rawPath } from "../gcs";
 import { savePageNow } from "../wayback";
 import { contentHash } from "./dedupe";
 import { ocrPdf } from "./ocr";
-import { chunkText, type Chunk } from "./chunk";
+import { chunkText } from "./chunk";
 import { generateContextualPrefixes } from "./contextual-prefix";
 import { embedBatch, toVectorLiteral } from "./embed";
 import { extractClaims } from "./claim-extract";
@@ -87,90 +87,85 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
     textContent = ocrResult.text;
   }
 
-  // 5. Create the Document row
-  const document = await prisma.document.create({
-    data: {
-      sourceUrl: input.sourceUrl,
-      archivedUrl,
-      gcsPath,
-      docType: input.docType,
-      title: input.title,
-      publishedAt: input.publishedAt,
-      sourceSystem: input.sourceSystem,
-      hash,
-      textContent,
-      metadata: input.metadata as object | undefined,
-    },
-    select: { id: true },
-  });
+  // 5. Chunk + embed FIRST so we can reject before committing a Document row.
+  //    (Prevents orphan Documents when the embed service is down or when
+  //    the Haiku contextual-prefix / embedding call fails mid-flight.)
+  const chunks =
+    textContent && textContent.length >= 50
+      ? chunkText(textContent, { targetTokens: 800, overlapTokens: 100 })
+      : [];
 
-  if (!textContent || textContent.length < 50) {
-    // No usable text — skip chunking / embedding / claim extraction.
-    return { documentId: document.id, skipped: false, chunkCount: 0, claimCount: 0 };
-  }
-
-  // 6. Chunk
-  const chunks = chunkText(textContent, { targetTokens: 800, overlapTokens: 100 });
-  if (chunks.length === 0) {
-    return { documentId: document.id, skipped: false, chunkCount: 0, claimCount: 0 };
-  }
-
-  // 7. Contextual prefixes (Haiku, cached document)
-  const prefixes = await generateContextualPrefixes({
-    documentText: textContent,
-    chunks: chunks.map((c) => c.text),
-  });
-
-  // 8. Embed (self-hosted)
-  const embeddings = await embedBatch(
-    chunks.map((c, i) => `${prefixes[i]} ${c.text}`)
-  );
-
-  // 9. Persist chunks + embeddings
-  for (let i = 0; i < chunks.length; i++) {
-    await persistChunk({
-      documentId: document.id,
-      chunk: chunks[i],
-      chunkIndex: i,
-      contextPrefix: prefixes[i] ?? "",
-      embedding: embeddings[i],
+  let prefixes: string[] = [];
+  let embeddings: number[][] = [];
+  if (chunks.length > 0) {
+    prefixes = await generateContextualPrefixes({
+      documentText: textContent,
+      chunks: chunks.map((c) => c.text),
     });
+    embeddings = await embedBatch(
+      chunks.map((c, i) => `${prefixes[i]} ${c.text}`)
+    );
   }
 
-  // 10. Claim extraction
-  const claimCount = await extractClaims({ documentId: document.id, chunks });
+  // 6. Commit Document + chunks together. If either the Document insert
+  //    or any chunk insert fails, the transaction rolls back and we leave
+  //    no orphans behind.
+  const documentId = await prisma.$transaction(async (tx) => {
+    const document = await tx.document.create({
+      data: {
+        sourceUrl: input.sourceUrl,
+        archivedUrl,
+        gcsPath,
+        docType: input.docType,
+        title: input.title,
+        publishedAt: input.publishedAt,
+        sourceSystem: input.sourceSystem,
+        hash,
+        textContent,
+        metadata: input.metadata as object | undefined,
+      },
+      select: { id: true },
+    });
+
+    for (let i = 0; i < chunks.length; i++) {
+      const row = await tx.documentChunk.create({
+        data: {
+          documentId: document.id,
+          chunkIndex: i,
+          text: chunks[i].text,
+          contextPrefix: prefixes[i] ?? "",
+          pageNumber: chunks[i].pageNumber,
+          charStart: chunks[i].charStart,
+          charEnd: chunks[i].charEnd,
+        },
+        select: { id: true },
+      });
+      const vectorLiteral = toVectorLiteral(embeddings[i]);
+      await tx.$executeRaw`
+        UPDATE "DocumentChunk"
+        SET embedding = ${vectorLiteral}::vector
+        WHERE id = ${row.id}
+      `;
+    }
+
+    return document.id;
+  });
+
+  // 7. Claim extraction runs AFTER the transaction commits. Claims that
+  //    fail to extract don't block the Document/chunks from being saved.
+  const claimCount =
+    chunks.length > 0
+      ? await extractClaims({ documentId, chunks }).catch((err) => {
+          console.error(`[ingest] claim extraction failed for ${documentId}:`, err);
+          return 0;
+        })
+      : 0;
 
   return {
-    documentId: document.id,
+    documentId,
     skipped: false,
     chunkCount: chunks.length,
     claimCount,
   };
 }
 
-async function persistChunk(params: {
-  documentId: string;
-  chunk: Chunk;
-  chunkIndex: number;
-  contextPrefix: string;
-  embedding: number[];
-}): Promise<void> {
-  const row = await prisma.documentChunk.create({
-    data: {
-      documentId: params.documentId,
-      chunkIndex: params.chunkIndex,
-      text: params.chunk.text,
-      contextPrefix: params.contextPrefix,
-      pageNumber: params.chunk.pageNumber,
-      charStart: params.chunk.charStart,
-      charEnd: params.chunk.charEnd,
-    },
-    select: { id: true },
-  });
-  const vectorLiteral = toVectorLiteral(params.embedding);
-  await prisma.$executeRaw`
-    UPDATE "DocumentChunk"
-    SET embedding = ${vectorLiteral}::vector
-    WHERE id = ${row.id}
-  `;
-}
