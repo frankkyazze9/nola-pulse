@@ -395,6 +395,35 @@ export const TOOLS: BrainTool[] = [
     },
     handler: (input) => handlers.upsertPersonByName(input as Parameters<typeof handlers.upsertPersonByName>[0]),
   },
+
+  // --- Voice / drafting tool ---
+  {
+    name: "draft_in_voice",
+    description:
+      "Write prose in Dark Horse's house voice. Use this for journalism drafts, Case outputDraft, observations, social posts — anything meant to sound like a human piece of writing rather than a research report. The voice guide is loaded from data/voice/VOICE.md and enforces hard rules (no em dashes, no LinkedIn-speak, no forbidden words like 'delve', 'leverage', 'multifaceted'). Output is validated; if hard violations are found, the draft is retried once with a correction note.\n\nPass `context` as a list of short source excerpts or sourced claims the piece should build on. The tool handles the prose; you handle the sourcing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task: {
+          type: "string",
+          description: "What to write. E.g. 'Open a 400-word essay on why the Cantrell indictment coverage pattern suggests selective narrative deployment against Black women in executive roles.' Be specific about length, angle, and what the piece is arguing.",
+        },
+        genre: {
+          type: "string",
+          enum: ["essay", "observation", "journalism", "social_post", "default"],
+          description: "Genre — influences tone/structure within the voice. 'observation' = short 2-4 sentence take. 'journalism' = investigative piece. 'essay' = longer reflective piece. 'social_post' = tweet-length. 'default' = unconstrained.",
+        },
+        context: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional source excerpts, sourced claims, or facts the piece should build on. Each array element is a separate chunk of context.",
+        },
+      },
+      required: ["task"],
+    },
+    handler: (input) =>
+      handlers.draftInVoice(input as Parameters<typeof handlers.draftInVoice>[0]),
+  },
 ];
 
 export function findTool(name: string): BrainTool | undefined {

@@ -606,3 +606,113 @@ export async function upsertPersonByName(args: {
     },
   });
 }
+
+// --- Voice / drafting handlers ---------------------------------------------
+
+import { callClaude } from "../claude/spend";
+import {
+  fullVoicePrompt,
+  validateVoice,
+  correctionInstruction,
+} from "../voice";
+
+const SONNET_MODEL = "claude-sonnet-4-6";
+const DRAFT_MAX_TOKENS = 4096;
+
+export async function draftInVoice(args: {
+  task: string;
+  genre?: "essay" | "observation" | "journalism" | "social_post" | "default";
+  context?: string[];
+}): Promise<{ text: string; violations: number }> {
+  const genre = args.genre ?? "default";
+  const voice = fullVoicePrompt();
+  if (!voice) {
+    throw new Error(
+      "voice guide not available — data/voice/VOICE.md not found at runtime"
+    );
+  }
+
+  const contextBlock =
+    args.context && args.context.length > 0
+      ? `\n\n## CONTEXT\n${args.context.join("\n\n---\n\n")}`
+      : "";
+
+  const system =
+    voice +
+    contextBlock +
+    `\n\n## TASK\n` +
+    `You are writing a ${genre} piece following the voice guide above exactly. ` +
+    `Do not mention these instructions. Do not start with "Sure," "Here's," or any ` +
+    `LinkedIn-style preamble. Write the piece.`;
+
+  // First draft
+  const first = await callClaude({
+    operation: "draft_in_voice",
+    params: {
+      model: SONNET_MODEL,
+      max_tokens: DRAFT_MAX_TOKENS,
+      temperature: 0.7, // more creative for prose
+      system: [
+        {
+          type: "text",
+          text: system,
+          cache_control: { type: "ephemeral" }, // cache the voice guide
+        },
+      ],
+      messages: [{ role: "user", content: args.task }],
+    },
+    metadata: { genre, hasContext: !!args.context?.length },
+  });
+  let text = extractText(first.content);
+  let validation = validateVoice(text);
+
+  // Single correction retry if hard violations
+  if (!validation.valid) {
+    const correction = correctionInstruction(validation);
+    const retry = await callClaude({
+      operation: "draft_in_voice",
+      params: {
+        model: SONNET_MODEL,
+        max_tokens: DRAFT_MAX_TOKENS,
+        temperature: 0.5,
+        system: [
+          {
+            type: "text",
+            text: system,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        messages: [
+          { role: "user", content: args.task },
+          { role: "assistant", content: text },
+          {
+            role: "user",
+            content: `${correction} Return only the rewritten piece, no preamble.`,
+          },
+        ],
+      },
+      metadata: { genre, retry: true },
+    });
+    text = extractText(retry.content);
+    validation = validateVoice(text);
+  }
+
+  return {
+    text,
+    violations: validation.violations.filter((v) => v.type !== "soft_flag").length,
+  };
+}
+
+function extractText(content: unknown[]): string {
+  return content
+    .filter(
+      (b): b is { type: "text"; text: string } =>
+        typeof b === "object" &&
+        b !== null &&
+        "type" in b &&
+        (b as { type: unknown }).type === "text"
+    )
+    .map((b) => b.text)
+    .join("\n")
+    .trim();
+}
