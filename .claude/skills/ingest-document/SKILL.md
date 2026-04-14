@@ -76,7 +76,7 @@ Every call logs to `ApiSpendLog` via `lib/claude/spend.ts`.
 
 ### 7 — Embedding
 
-`lib/ingest/embed.ts` POSTs the prefixed chunk text to the `dark-horse-embed` Cloud Run service (VPC-private) which runs **BGE-small-en-v1.5** (384 dim). The returned vector is written into the pgvector `embedding` column on `DocumentChunk`.
+`lib/ingest/embed.ts` POSTs the prefixed chunk text to the `dark-horse-embed` Cloud Run service (currently `--allow-unauthenticated` — see TRIAGE.md item #2 for the proper service-to-service auth fix). Runs **BGE-small-en-v1.5** (384 dim). The returned vector is written into the pgvector `embedding` column on `DocumentChunk`.
 
 **Zero API cost.** Just Cloud Run compute (~$2/mo scaled to zero).
 
@@ -100,6 +100,12 @@ Every LLM call in this pipeline goes through `lib/claude/batch.ts` which:
 - Hard-fails at $95 MTD.
 
 If a call would push over the cap, the pipeline skips the prefix/claim-extract steps and logs the skip — the document is still ingested and searchable, just without the LLM-derived enrichments until next month.
+
+## Transactional commit (critical)
+
+`ingestDocument` defers the `Document.create` until chunks + embeddings are ready, then commits `Document` + all `DocumentChunk` rows in a single `prisma.$transaction`. If any step in 5-7 throws, nothing commits — **no orphan Documents**. Claim extraction (step 9) runs AFTER the transaction with its own error handling, so claim failures don't rollback the doc.
+
+Prior to this pattern (fixed 2026-04-14, see TRIAGE.md #1), a failed embed call left the Document row in the DB with no chunks, silently polluting the corpus. Content-hash dedupe would then block retry.
 
 ## When NOT to re-ingest
 

@@ -20,11 +20,17 @@ Last updated: 2026-04-14
 
 **Lesson:** Hand-written migrations that mix Prisma's generated DDL with raw SQL need extra verification — either a post-migration check or a dedicated migration test.
 
-### -0.5. [x] Ballotpedia CloudFront 403s bot user agents
+### -0.5. [~] Ballotpedia CloudFront blocks Cloud Run IPs even with Chrome UA
 
-**Resolved:** updated `pipelines/scrapers/ballotpedia/index.ts` to send a Chrome User-Agent + browser Accept headers. CloudFront returns 200 with these.
+**Status:** partially resolved. Laptop (residential IP) + Chrome UA works fine (200, full HTML). Cloud Run IPs still get reduced/stub responses (~157 chars) even with identical headers.
 
-**Problem:** First run returned 3× "too short (0 chars)" errors because CloudFront served 403 HTML to our `DarkHorse/1.0` UA, and the HTML-to-text stripper reduced those to empty content.
+**Workaround options:**
+- Use Wikipedia election pages instead (same content, MediaWiki, no CloudFront blocking)
+- Route through a scraping service (ScrapingBee, ScrapFly, Apify) — residential IPs bypass CloudFront detection
+- Run a dedicated scraper as a Cloud Run Job with a static outbound IP via Cloud NAT (can then ask Ballotpedia to whitelist)
+- Use SociaVault's general URL scraping endpoint (when we wire that up in Phase 7)
+
+**For now:** Ballotpedia scraper leaves 3 error rows per run but returns quickly. Brain populates candidates from news coverage instead until we pick a workaround.
 
 ### 0. [x] cloudbuild.yaml was missing EMBEDDING_SERVICE_URL / DOCUMENT_AI_PROCESSOR_ID
 
