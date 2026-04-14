@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
   "/api/telegram/webhook", // Telegram webhook has its own secret-token auth
+  "/api/jobs/", // cron/job endpoints auth via x-cron-secret header
   "/favicon.ico",
 ];
 
