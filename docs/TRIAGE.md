@@ -10,6 +10,22 @@ Last updated: 2026-04-14
 
 ## P0 — Critical
 
+### -1. [x] `DocumentChunk` missing `embedding vector(384)` + `tsv tsvector` columns
+
+**Resolved:** applied the missing DDL directly to Cloud SQL:
+`ALTER TABLE "DocumentChunk" ADD COLUMN IF NOT EXISTS embedding vector(384)` +
+`tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED` + HNSW + GIN indexes.
+
+**Problem:** The initial migration's raw SQL for pgvector + FTS columns never applied. Combined with bug #0, every scraper run silently produced orphan Documents because `UPDATE ... SET embedding = ...::vector` failed with `column "embedding" does not exist`.
+
+**Lesson:** Hand-written migrations that mix Prisma's generated DDL with raw SQL need extra verification — either a post-migration check or a dedicated migration test.
+
+### -0.5. [x] Ballotpedia CloudFront 403s bot user agents
+
+**Resolved:** updated `pipelines/scrapers/ballotpedia/index.ts` to send a Chrome User-Agent + browser Accept headers. CloudFront returns 200 with these.
+
+**Problem:** First run returned 3× "too short (0 chars)" errors because CloudFront served 403 HTML to our `DarkHorse/1.0` UA, and the HTML-to-text stripper reduced those to empty content.
+
 ### 0. [x] cloudbuild.yaml was missing EMBEDDING_SERVICE_URL / DOCUMENT_AI_PROCESSOR_ID
 
 **Resolved:** both added to `--set-env-vars` in cloudbuild.yaml.

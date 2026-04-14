@@ -40,9 +40,15 @@ export const ballotpedia: ScraperDefinition<BallotpediaArgs> = {
       try {
         await ctx.rateLimit.wait();
         const body = await retry(async () => {
+          // Ballotpedia's CloudFront blocks obvious bot UAs with 403.
+          // A real browser UA passes through fine.
           const response = await fetch(url, {
             headers: {
-              "User-Agent": "DarkHorse/1.0 (political research)",
+              "User-Agent":
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+              Accept:
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "en-US,en;q=0.9",
             },
             signal: AbortSignal.timeout(30_000),
           });

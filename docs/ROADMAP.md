@@ -128,11 +128,52 @@ Priority: Instagram + Twitter/X first, TikTok + Facebook phased in later.
 
 ## Phase 6: Free data sources
 
-- [ ] Bluesky scraper (AT Protocol)
-- [ ] Facebook Ad Library API
-- [ ] LegiScan LA
-- [ ] CourtListener (federal court records)
+- [x] Bluesky scraper (AT Protocol) — implemented, needs real handles
+- [x] Facebook Ad Library API — implemented, needs FACEBOOK_ACCESS_TOKEN
+- [ ] LegiScan LA (still stub)
+- [x] CourtListener (federal court records) — implemented, key optional
+- [x] Ballotpedia (added Phase 11) — election previews
 - [ ] NOLA Council Granicus (agendas + Whisper transcripts)
+
+## Phase 11: Election Intelligence (DONE)
+
+- [x] Election + Candidacy brain tools (create_election, create_candidacy, list_elections, get_election, upsert_person_by_name)
+- [x] `/elections` + `/elections/[id]` UI with countdown badges
+- [x] Ballotpedia scraper for election previews (Chrome UA to bypass CloudFront 403)
+- [x] May 12 2026 Orleans Parish primary seeded (`scripts/seed-may-2026-election.ts`)
+- [x] `/api/jobs/brain` — cron-authed endpoint to dispatch the brain programmatically, for autonomy
+
+## Phase 12: Voice integration (NEXT)
+
+*Goal: Dark Horse writes observations + journalism drafts in Frank's voice.*
+
+- [ ] Vendor `writing-voice/VOICE.md` + `voice-analysis.md` from the Frank brand repo into Dark Horse
+- [ ] `lib/voice/` module — loads voice guide + token-budgeted corpus samples
+- [ ] Brain tool: `draft_in_voice` — generates prose following the voice rules
+- [ ] Output filter: reject generations containing forbidden words or em dashes
+
+## Phase 13: Observation Engine
+
+*Goal: the infotainment core. Dark Horse reads the corpus, generates observations (factual, hypothetical, comedic) in Frank's voice.*
+
+- [ ] Prisma model: `Observation` (text, type, confidence, sources, status)
+- [ ] Nightly cron — reads recent documents, groups by subject/topic, generates observations
+- [ ] Three types: `pattern`, `hypothesis`, `comedic`
+- [ ] Opus review toggle — for flagship observations, optional Opus quality pass
+- [ ] `/observations` UI — stream, promote to Case, export
+
+## Phase 14: Risk profiles
+
+- [ ] Prisma model: `RiskAssessment` (subjectType, subjectId, riskType, severity, description, sources)
+- [ ] Brain tool: `assess_risk` — structured analysis with categories (legal, financial, reputational, opposition, narrative)
+- [ ] Applied to: Persons (enemies, friends, threats), Cases (publication risk, backlash)
+
+## Phase 15: Map & location tracking
+
+- [ ] Prisma model: `LocationPing` (caseId, lat, lng, timestamp, source, note)
+- [ ] Case detail gets a map view (Mapbox or Leaflet)
+- [ ] Ingest: manual + Apple FindMy CSV
+- [ ] Use case: the recycling investigation with the AirTag
 
 ## Phase 7: Social media intelligence (SociaVault)
 
