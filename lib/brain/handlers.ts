@@ -716,3 +716,55 @@ function extractText(content: unknown[]): string {
     .join("\n")
     .trim();
 }
+
+// --- Observation handlers --------------------------------------------------
+
+import { runObservationPass } from "../observation";
+
+export async function generateObservations(args: {
+  sinceHours?: number;
+  limit?: number;
+}) {
+  return runObservationPass({
+    sinceHours: args.sinceHours ?? 24,
+    limit: args.limit ?? 20,
+  });
+}
+
+export async function listObservations(args: {
+  type?: "pattern" | "hypothesis" | "comedy";
+  status?: "draft" | "approved" | "rejected" | "published";
+  limit?: number;
+}) {
+  return prisma.observation.findMany({
+    where: {
+      ...(args.type ? { type: args.type } : {}),
+      ...(args.status ? { status: args.status } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: args.limit ?? 50,
+    include: {
+      sources: {
+        include: {
+          document: {
+            select: { title: true, sourceUrl: true, sourceSystem: true },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function updateObservationStatus(args: {
+  observationId: string;
+  status: "draft" | "approved" | "rejected" | "published";
+  note?: string;
+}) {
+  return prisma.observation.update({
+    where: { id: args.observationId },
+    data: {
+      status: args.status,
+      ...(args.note !== undefined ? { note: args.note } : {}),
+    },
+  });
+}

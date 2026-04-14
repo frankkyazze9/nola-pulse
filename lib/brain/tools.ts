@@ -424,6 +424,48 @@ export const TOOLS: BrainTool[] = [
     handler: (input) =>
       handlers.draftInVoice(input as Parameters<typeof handlers.draftInVoice>[0]),
   },
+
+  // --- Observation engine tools ---
+  {
+    name: "generate_observations",
+    description:
+      "Run the observation pass: triage recent documents, generate typed observations (pattern / hypothesis / comedy) for passing documents. Use this when the user asks to 'run observations' or 'see what's new', or when you want to seed comedy/pattern takes on a recent batch of ingested content. Returns counts: candidatesExamined, passedTriage, observationsCreated.",
+    input_schema: {
+      type: "object",
+      properties: {
+        sinceHours: { type: "number", description: "Lookback window in hours (default 24)" },
+        limit: { type: "number", description: "Max source documents to process (default 20)" },
+      },
+    },
+    handler: (input) => handlers.generateObservations(input as Parameters<typeof handlers.generateObservations>[0]),
+  },
+  {
+    name: "list_observations",
+    description: "List observations, optionally filtered by type and/or status. Use when the user asks what observations exist or wants to review specific types.",
+    input_schema: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["pattern", "hypothesis", "comedy"] },
+        status: { type: "string", enum: ["draft", "approved", "rejected", "published"] },
+        limit: { type: "number" },
+      },
+    },
+    handler: (input) => handlers.listObservations(input as Parameters<typeof handlers.listObservations>[0]),
+  },
+  {
+    name: "update_observation_status",
+    description: "Approve, reject, or publish an observation. Use when the user reacts to an observation (loves it, hates it, wants to share it).",
+    input_schema: {
+      type: "object",
+      properties: {
+        observationId: { type: "string" },
+        status: { type: "string", enum: ["draft", "approved", "rejected", "published"] },
+        note: { type: "string" },
+      },
+      required: ["observationId", "status"],
+    },
+    handler: (input) => handlers.updateObservationStatus(input as Parameters<typeof handlers.updateObservationStatus>[0]),
+  },
 ];
 
 export function findTool(name: string): BrainTool | undefined {

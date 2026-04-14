@@ -37,6 +37,7 @@ steps:
       - '1Gi'
       - '--cpu'
       - '1'
+      - '--no-cpu-throttling'
       - '--concurrency'
       - '40'
       - '--min-instances'

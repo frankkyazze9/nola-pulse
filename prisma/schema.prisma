@@ -44,6 +44,7 @@ model Person {
   claims         Claim[]          @relation("personClaims")
   caseEvidence   CaseEvidence[]
   projectSubject Project[]        @relation("projectSubjectPerson")
+  observations   Observation[]    @relation("personObservations")
 
   @@index([familyName, givenName])
 }
@@ -69,6 +70,7 @@ model Organization {
   claims            Claim[]         @relation("orgClaims")
   caseEvidence      CaseEvidence[]
   projectSubject    Project[]       @relation("projectSubjectOrg")
+  observations      Observation[]   @relation("orgObservations")
 
   @@index([name])
 }
@@ -259,6 +261,7 @@ model Document {
   courtCases     CourtCase[]     @relation("caseDoc")
   claims         Claim[]         @relation("claimDoc")
   caseEvidence   CaseEvidence[]
+  observationSources ObservationSource[]
 
   @@index([sourceSystem])
   @@index([publishedAt])
@@ -397,6 +400,51 @@ model ConversationMessage {
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// -- Observations (pattern / hypothesis / comedy takes on findings) --------
+//
+// The Observation Engine reads recent documents, triages for observation-
+// worthiness (pattern deviation, absurdity, hidden obvious, underreported
+// angle), and generates up to 3 typed observations per passing group.
+// See `.claude/memory/reference_observation_and_comedy.md` for definitions.
+
+model Observation {
+  id              String   @id @default(cuid())
+  type            String // "pattern" | "hypothesis" | "comedy"
+  text            String   @db.Text
+  confidence      Float    @default(0.7) // 0..1 — lower for hypotheses/comedy
+  subjectPersonId String?
+  subjectPerson   Person?  @relation("personObservations", fields: [subjectPersonId], references: [id], onDelete: SetNull)
+  subjectOrgId    String?
+  subjectOrg      Organization? @relation("orgObservations", fields: [subjectOrgId], references: [id], onDelete: SetNull)
+  topic           String? // free-form topic tag e.g. "recycling", "courts-restructure"
+  status          String   @default("draft") // "draft" | "approved" | "rejected" | "published"
+  note            String?  @db.Text // optional editor note
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Which documents this observation was generated from
+  sources   ObservationSource[]
+
+  @@index([type, createdAt])
+  @@index([status, createdAt])
+  @@index([subjectPersonId])
+  @@index([subjectOrgId])
+  @@index([topic])
+}
+
+model ObservationSource {
+  id            String      @id @default(cuid())
+  observationId String
+  observation   Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+  documentId    String
+  document      Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkId       String?
+  quote         String?     @db.Text
+
+  @@index([observationId])
+  @@index([documentId])
 }
 
 // -- Infrastructure (entity resolution, scraper observability, spend) ------
