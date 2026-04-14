@@ -154,16 +154,26 @@ async function runTool(block: ToolUseBlock): Promise<ToolResultBlockParam> {
   }
 }
 
+export interface PriorMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 interface LoopOptions {
   operation: "brain_interactive" | "brain_dossier";
   systemText: string;
   initialUserMessage: string;
   maxTokens: number;
+  priorMessages?: PriorMessage[];
 }
 
 async function runToolUseLoop(opts: LoopOptions): Promise<string> {
   const apiTools = buildApiTools();
   const messages: MessageParam[] = [
+    ...(opts.priorMessages ?? []).map((m) => ({
+      role: m.role,
+      content: m.content,
+    })),
     { role: "user", content: opts.initialUserMessage },
   ];
 
@@ -240,13 +250,17 @@ function stripJsonFences(text: string): string {
 
 // --- Public entry points ----------------------------------------------------
 
-export async function runBrainInteractive(question: string): Promise<BrainAnswer> {
+export async function runBrainInteractive(
+  question: string,
+  opts: { priorMessages?: PriorMessage[] } = {}
+): Promise<BrainAnswer> {
   const systemText = `${BRAIN_BASE_SYSTEM}\n\n${INTERACTIVE_SCHEMA_HINT}`;
   const rawText = await runToolUseLoop({
     operation: "brain_interactive",
     systemText,
     initialUserMessage: question,
     maxTokens: INTERACTIVE_MAX_TOKENS,
+    priorMessages: opts.priorMessages,
   });
   return parseAndValidate(rawText, BrainAnswerSchema, {
     operation: "brain_interactive",

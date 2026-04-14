@@ -27,6 +27,11 @@ import { getMonthToDateSpendByService } from "@/lib/spend";
 import { prisma } from "@/lib/db";
 import { isAllowedUser, sendChatAction, sendMessage } from "@/lib/telegram";
 import { SpendCapExceededError } from "@/lib/claude/spend";
+import {
+  getOrCreateConversation,
+  loadRecentMessages,
+  saveMessage,
+} from "@/lib/conversation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,14 +89,18 @@ export async function POST(request: Request) {
 
   // Run the handler in the background so we return to Telegram quickly.
   // Telegram will retry if we don't 200 within ~30s.
-  handleMessage(chatId, text).catch((err) => {
+  handleMessage(chatId, userId, text).catch((err) => {
     console.error("[telegram] handler error:", err);
   });
 
   return Response.json({ ok: true });
 }
 
-async function handleMessage(chatId: number, text: string): Promise<void> {
+async function handleMessage(
+  chatId: number,
+  userId: number,
+  text: string
+): Promise<void> {
   try {
     await sendChatAction(chatId, "typing");
 
@@ -119,8 +128,9 @@ async function handleMessage(chatId: number, text: string): Promise<void> {
           "/cases — list active cases\n" +
           "/project <title> — create a project (campaign/brand)\n" +
           "/projects — list active projects\n" +
-          "/status — show spend and scraper health\n\n" +
-          "Or just type a question. I'll research it."
+          "/status — show spend and scraper health\n" +
+          "/reset — clear conversation memory\n\n" +
+          "Or just type a question. I'll research it and remember the conversation."
       );
       return;
     }
@@ -192,6 +202,15 @@ async function handleMessage(chatId: number, text: string): Promise<void> {
       return;
     }
 
+    if (text === "/reset") {
+      const convId = await getOrCreateConversation("telegram", String(userId));
+      await prisma.conversationMessage.deleteMany({
+        where: { conversationId: convId },
+      });
+      await sendMessage(chatId, "Conversation memory cleared.");
+      return;
+    }
+
     if (text === "/status") {
       const spendByService = await getMonthToDateSpendByService();
       const totalSpend = Object.values(spendByService).reduce((a, b) => a + b, 0);
@@ -219,11 +238,19 @@ async function handleMessage(chatId: number, text: string): Promise<void> {
       return;
     }
 
-    // Free-form text → brain
-    const answer = await runBrainInteractive(text);
+    // Free-form text → brain, with conversation memory
+    const conversationId = await getOrCreateConversation("telegram", String(userId));
+    const priorMessages = await loadRecentMessages(conversationId);
+
+    // Persist the user message before calling the brain so it's saved even
+    // if the brain call fails.
+    await saveMessage(conversationId, "user", text);
+
+    const answer = await runBrainInteractive(text, { priorMessages });
     const response = answer.markdown || "(no answer)";
 
-    // Optionally append source count footer
+    await saveMessage(conversationId, "assistant", response);
+
     const footer =
       answer.sourcesConsulted.length > 0
         ? `\n\n_${answer.sourcesConsulted.length} source${answer.sourcesConsulted.length === 1 ? "" : "s"} consulted_`

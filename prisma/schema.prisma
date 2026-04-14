@@ -368,6 +368,37 @@ model Project {
   @@index([subjectOrgId])
 }
 
+// -- Conversation memory ----------------------------------------------------
+//
+// Per-channel, per-user conversation history. One Conversation per
+// (channel, externalUserId) pair. Messages roll up in chronological order.
+// Each brain call loads the last N messages and passes them as prior
+// context so the agent has memory across turns.
+
+model Conversation {
+  id             String   @id @default(cuid())
+  channel        String // "telegram" | "web"
+  externalUserId String // Telegram user ID (string) or web session ID
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  messages ConversationMessage[]
+
+  @@unique([channel, externalUserId])
+  @@index([updatedAt])
+}
+
+model ConversationMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant"
+  content        String       @db.Text
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
 // -- Infrastructure (entity resolution, scraper observability, spend) ------
 
 model EntityMatch {
