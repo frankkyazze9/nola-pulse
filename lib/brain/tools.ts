@@ -318,6 +318,83 @@ export const TOOLS: BrainTool[] = [
     },
     handler: (input) => handlers.listProjects(input as Parameters<typeof handlers.listProjects>[0]),
   },
+
+  // --- Election intelligence tools ---
+  {
+    name: "create_election",
+    description:
+      "Register an election in the knowledge graph. Use when the user describes an upcoming election or you discover one in ingested coverage. jurisdictionOcdId must match a seeded jurisdiction (e.g. ocd-division/country:us/state:la/place:new_orleans).",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "ISO date of the election, e.g. 2026-05-12" },
+        jurisdictionOcdId: { type: "string", description: "OCD division ID of the jurisdiction holding the election" },
+        electionType: { type: "string", enum: ["primary", "general", "runoff", "special"] },
+        ocdId: { type: "string", description: "Optional OCD election ID" },
+      },
+      required: ["date", "jurisdictionOcdId", "electionType"],
+    },
+    handler: (input) => handlers.createElection(input as Parameters<typeof handlers.createElection>[0]),
+  },
+  {
+    name: "create_candidacy",
+    description:
+      "Register a person as a candidate in a specific election + post. personId and electionId must exist; postOcdId must match a seeded post. Use outcome='pending' for races that haven't happened yet.",
+    input_schema: {
+      type: "object",
+      properties: {
+        personId: { type: "string" },
+        electionId: { type: "string" },
+        postOcdId: { type: "string", description: "OCD post ID of the seat being contested" },
+        outcome: { type: "string", enum: ["won", "lost", "withdrew", "pending"] },
+        votesReceived: { type: "number" },
+        votesPct: { type: "number" },
+      },
+      required: ["personId", "electionId", "postOcdId"],
+    },
+    handler: (input) => handlers.createCandidacy(input as Parameters<typeof handlers.createCandidacy>[0]),
+  },
+  {
+    name: "list_elections",
+    description:
+      "List elections, optionally filtered to upcoming only or a specific jurisdiction. Returns each election with its candidacies.",
+    input_schema: {
+      type: "object",
+      properties: {
+        upcoming: { type: "boolean" },
+        jurisdictionOcdId: { type: "string" },
+        limit: { type: "number" },
+      },
+    },
+    handler: (input) => handlers.listElections(input as Parameters<typeof handlers.listElections>[0]),
+  },
+  {
+    name: "get_election",
+    description: "Load a single election with full candidacy details (person + post).",
+    input_schema: {
+      type: "object",
+      properties: { electionId: { type: "string" } },
+      required: ["electionId"],
+    },
+    handler: (input) => handlers.getElection(input as Parameters<typeof handlers.getElection>[0]),
+  },
+  {
+    name: "upsert_person_by_name",
+    description:
+      "Find or create a Person record by given + family name. Use when registering candidates the agent discovered in ingested coverage. If the person already exists, updates middleName/party/aliases if provided. Returns the Person row including id for use with create_candidacy.",
+    input_schema: {
+      type: "object",
+      properties: {
+        givenName: { type: "string" },
+        familyName: { type: "string" },
+        middleName: { type: "string" },
+        party: { type: "string" },
+        aliases: { type: "array", items: { type: "string" } },
+      },
+      required: ["givenName", "familyName"],
+    },
+    handler: (input) => handlers.upsertPersonByName(input as Parameters<typeof handlers.upsertPersonByName>[0]),
+  },
 ];
 
 export function findTool(name: string): BrainTool | undefined {

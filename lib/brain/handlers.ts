@@ -473,3 +473,136 @@ export async function listProjects(args: { status?: string; limit?: number }) {
     },
   });
 }
+
+// --- Election intelligence handlers ----------------------------------------
+
+export async function createElection(args: {
+  date: string; // ISO
+  jurisdictionOcdId: string;
+  electionType: "primary" | "general" | "runoff" | "special";
+  ocdId?: string;
+}) {
+  const jurisdiction = await prisma.jurisdiction.findUnique({
+    where: { ocdId: args.jurisdictionOcdId },
+    select: { id: true },
+  });
+  if (!jurisdiction) {
+    throw new Error(`jurisdiction not found: ${args.jurisdictionOcdId}`);
+  }
+  return prisma.election.create({
+    data: {
+      date: new Date(args.date),
+      jurisdictionId: jurisdiction.id,
+      electionType: args.electionType,
+      ocdId: args.ocdId,
+    },
+  });
+}
+
+export async function createCandidacy(args: {
+  personId: string;
+  electionId: string;
+  postOcdId: string;
+  outcome?: "won" | "lost" | "withdrew" | "pending";
+  votesReceived?: number;
+  votesPct?: number;
+}) {
+  const post = await prisma.post.findUnique({
+    where: { ocdId: args.postOcdId },
+    select: { id: true },
+  });
+  if (!post) throw new Error(`post not found: ${args.postOcdId}`);
+  return prisma.candidacy.create({
+    data: {
+      personId: args.personId,
+      electionId: args.electionId,
+      postId: post.id,
+      outcome: args.outcome ?? "pending",
+      votesReceived: args.votesReceived,
+      votesPct: args.votesPct,
+    },
+  });
+}
+
+export async function listElections(args: {
+  upcoming?: boolean;
+  jurisdictionOcdId?: string;
+  limit?: number;
+}) {
+  const where: Record<string, unknown> = {};
+  if (args.upcoming) where.date = { gte: new Date() };
+  if (args.jurisdictionOcdId) {
+    const j = await prisma.jurisdiction.findUnique({
+      where: { ocdId: args.jurisdictionOcdId },
+      select: { id: true },
+    });
+    if (j) where.jurisdictionId = j.id;
+  }
+  return prisma.election.findMany({
+    where,
+    orderBy: { date: "asc" },
+    take: args.limit ?? 50,
+    include: {
+      jurisdiction: { select: { name: true, ocdId: true } },
+      candidacies: {
+        include: {
+          person: {
+            select: { id: true, givenName: true, middleName: true, familyName: true, party: true },
+          },
+          post: { select: { label: true, ocdId: true } },
+        },
+      },
+    },
+  });
+}
+
+export async function getElection(args: { electionId: string }) {
+  return prisma.election.findUnique({
+    where: { id: args.electionId },
+    include: {
+      jurisdiction: true,
+      candidacies: {
+        include: {
+          person: true,
+          post: { include: { jurisdiction: { select: { name: true } } } },
+        },
+      },
+    },
+  });
+}
+
+export async function upsertPersonByName(args: {
+  givenName: string;
+  familyName: string;
+  middleName?: string;
+  party?: string;
+  aliases?: string[];
+}) {
+  // Try to find by exact given + family name first
+  const existing = await prisma.person.findFirst({
+    where: {
+      givenName: args.givenName,
+      familyName: args.familyName,
+    },
+    select: { id: true },
+  });
+  if (existing) {
+    return prisma.person.update({
+      where: { id: existing.id },
+      data: {
+        ...(args.middleName ? { middleName: args.middleName } : {}),
+        ...(args.party ? { party: args.party } : {}),
+        ...(args.aliases && args.aliases.length > 0 ? { aliases: args.aliases } : {}),
+      },
+    });
+  }
+  return prisma.person.create({
+    data: {
+      givenName: args.givenName,
+      familyName: args.familyName,
+      middleName: args.middleName,
+      party: args.party,
+      aliases: args.aliases ?? [],
+    },
+  });
+}
