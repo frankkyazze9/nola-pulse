@@ -322,3 +322,154 @@ export async function webSearch(args: { query: string }) {
     results: [],
   };
 }
+
+// --- Case (investigation) handlers -----------------------------------------
+
+export async function createCase(args: { title: string; brief: string }) {
+  const row = await prisma.case.create({
+    data: { title: args.title, brief: args.brief, status: "active" },
+    select: { id: true, title: true, brief: true, status: true, createdAt: true },
+  });
+  return row;
+}
+
+export async function updateCase(args: {
+  caseId: string;
+  title?: string;
+  brief?: string;
+  status?: "active" | "paused" | "closed" | "published";
+  findings?: Record<string, unknown>;
+  outputDraft?: string;
+}) {
+  const row = await prisma.case.update({
+    where: { id: args.caseId },
+    data: {
+      ...(args.title !== undefined ? { title: args.title } : {}),
+      ...(args.brief !== undefined ? { brief: args.brief } : {}),
+      ...(args.status !== undefined ? { status: args.status } : {}),
+      ...(args.findings !== undefined ? { findings: args.findings as object } : {}),
+      ...(args.outputDraft !== undefined ? { outputDraft: args.outputDraft } : {}),
+    },
+  });
+  return row;
+}
+
+export async function attachEvidence(args: {
+  caseId: string;
+  role?: "primary_source" | "supporting" | "contradicting" | "background";
+  documentId?: string;
+  claimId?: string;
+  personId?: string;
+  organizationId?: string;
+  note?: string;
+}) {
+  const row = await prisma.caseEvidence.create({
+    data: {
+      caseId: args.caseId,
+      role: args.role ?? "supporting",
+      documentId: args.documentId,
+      claimId: args.claimId,
+      personId: args.personId,
+      organizationId: args.organizationId,
+      note: args.note,
+    },
+  });
+  return row;
+}
+
+export async function getCase(args: { caseId: string }) {
+  return prisma.case.findUnique({
+    where: { id: args.caseId },
+    include: {
+      evidence: {
+        include: {
+          document: {
+            select: { id: true, title: true, sourceUrl: true, sourceSystem: true, publishedAt: true },
+          },
+          claim: {
+            select: { id: true, predicate: true, objectText: true, confidence: true },
+          },
+          person: { select: { id: true, givenName: true, familyName: true } },
+          organization: { select: { id: true, name: true, orgType: true } },
+        },
+        orderBy: { addedAt: "desc" },
+      },
+    },
+  });
+}
+
+export async function listCases(args: { status?: string; limit?: number }) {
+  return prisma.case.findMany({
+    where: args.status ? { status: args.status } : {},
+    orderBy: { updatedAt: "desc" },
+    take: args.limit ?? 50,
+    select: { id: true, title: true, status: true, createdAt: true, updatedAt: true },
+  });
+}
+
+// --- Project (campaign/brand) handlers -------------------------------------
+
+export async function createProject(args: {
+  title: string;
+  kind?: "campaign" | "brand" | "other";
+  subjectPersonId?: string;
+  subjectOrgId?: string;
+  goals?: Record<string, unknown>;
+}) {
+  const row = await prisma.project.create({
+    data: {
+      title: args.title,
+      kind: args.kind ?? "campaign",
+      subjectPersonId: args.subjectPersonId,
+      subjectOrgId: args.subjectOrgId,
+      goals: args.goals as object | undefined,
+      status: "active",
+    },
+  });
+  return row;
+}
+
+export async function updateProject(args: {
+  projectId: string;
+  title?: string;
+  status?: "active" | "paused" | "closed";
+  goals?: Record<string, unknown>;
+  brandAnalysis?: Record<string, unknown>;
+  influencerMap?: Record<string, unknown>;
+  growthPlan?: Record<string, unknown>;
+}) {
+  const row = await prisma.project.update({
+    where: { id: args.projectId },
+    data: {
+      ...(args.title !== undefined ? { title: args.title } : {}),
+      ...(args.status !== undefined ? { status: args.status } : {}),
+      ...(args.goals !== undefined ? { goals: args.goals as object } : {}),
+      ...(args.brandAnalysis !== undefined ? { brandAnalysis: args.brandAnalysis as object } : {}),
+      ...(args.influencerMap !== undefined ? { influencerMap: args.influencerMap as object } : {}),
+      ...(args.growthPlan !== undefined ? { growthPlan: args.growthPlan as object } : {}),
+    },
+  });
+  return row;
+}
+
+export async function getProject(args: { projectId: string }) {
+  return prisma.project.findUnique({
+    where: { id: args.projectId },
+    include: {
+      subjectPerson: true,
+      subjectOrg: true,
+    },
+  });
+}
+
+export async function listProjects(args: { status?: string; limit?: number }) {
+  return prisma.project.findMany({
+    where: args.status ? { status: args.status } : {},
+    orderBy: { updatedAt: "desc" },
+    take: args.limit ?? 50,
+    include: {
+      subjectPerson: { select: { givenName: true, familyName: true } },
+      subjectOrg: { select: { name: true } },
+    },
+  });
+}

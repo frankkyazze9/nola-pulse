@@ -183,6 +183,141 @@ export const TOOLS: BrainTool[] = [
     },
     handler: (input) => handlers.webSearch(input as Parameters<typeof handlers.webSearch>[0]),
   },
+
+  // --- Case (investigation) tools ---
+  {
+    name: "create_case",
+    description:
+      "Create a new investigation case. Use when the user describes an investigation they want to run (e.g. 'Is NOLA recycling real?'). Returns the new Case record with id.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the investigation." },
+        brief: { type: "string", description: "What are we investigating and why. Include the question, background, and known leads." },
+      },
+      required: ["title", "brief"],
+    },
+    handler: (input) => handlers.createCase(input as Parameters<typeof handlers.createCase>[0]),
+  },
+  {
+    name: "update_case",
+    description:
+      "Update a case's title, brief, status, findings (structured JSON), or outputDraft (journalism piece). Status values: active | paused | closed | published.",
+    input_schema: {
+      type: "object",
+      properties: {
+        caseId: { type: "string" },
+        title: { type: "string" },
+        brief: { type: "string" },
+        status: { type: "string", enum: ["active", "paused", "closed", "published"] },
+        findings: { type: "object", description: "Structured findings: { summary, key_claims, timeline, open_questions, etc. }" },
+        outputDraft: { type: "string", description: "Markdown draft of the investigative journalism piece." },
+      },
+      required: ["caseId"],
+    },
+    handler: (input) => handlers.updateCase(input as Parameters<typeof handlers.updateCase>[0]),
+  },
+  {
+    name: "attach_evidence",
+    description:
+      "Link a document, claim, person, or organization to a case as evidence. Role: primary_source | supporting | contradicting | background.",
+    input_schema: {
+      type: "object",
+      properties: {
+        caseId: { type: "string" },
+        role: { type: "string", enum: ["primary_source", "supporting", "contradicting", "background"] },
+        documentId: { type: "string" },
+        claimId: { type: "string" },
+        personId: { type: "string" },
+        organizationId: { type: "string" },
+        note: { type: "string", description: "Why this evidence matters." },
+      },
+      required: ["caseId"],
+    },
+    handler: (input) => handlers.attachEvidence(input as Parameters<typeof handlers.attachEvidence>[0]),
+  },
+  {
+    name: "get_case",
+    description: "Load a case with all its attached evidence. Use when resuming work on an existing investigation.",
+    input_schema: {
+      type: "object",
+      properties: { caseId: { type: "string" } },
+      required: ["caseId"],
+    },
+    handler: (input) => handlers.getCase(input as Parameters<typeof handlers.getCase>[0]),
+  },
+  {
+    name: "list_cases",
+    description: "List cases, optionally filtered by status.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: { type: "string" },
+        limit: { type: "number" },
+      },
+    },
+    handler: (input) => handlers.listCases(input as Parameters<typeof handlers.listCases>[0]),
+  },
+
+  // --- Project (campaign/brand) tools ---
+  {
+    name: "create_project",
+    description:
+      "Create a new campaign or brand project. Use when the user describes a candidate they're helping or a brand they're building. Link to a Person (subjectPersonId) or Organization (subjectOrgId) from the knowledge graph.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        kind: { type: "string", enum: ["campaign", "brand", "other"] },
+        subjectPersonId: { type: "string" },
+        subjectOrgId: { type: "string" },
+        goals: { type: "object", description: "Agent-structured goals: { win_race?, increase_name_id?, target_demographics?, etc. }" },
+      },
+      required: ["title"],
+    },
+    handler: (input) => handlers.createProject(input as Parameters<typeof handlers.createProject>[0]),
+  },
+  {
+    name: "update_project",
+    description:
+      "Update a project's title, status, goals, brand analysis, influencer map, or growth plan. All analysis fields are structured JSON the agent builds up over time.",
+    input_schema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        title: { type: "string" },
+        status: { type: "string", enum: ["active", "paused", "closed"] },
+        goals: { type: "object" },
+        brandAnalysis: { type: "object", description: "{ current_perception, coverage_summary, social_presence, strengths, weaknesses, etc. }" },
+        influencerMap: { type: "object", description: "{ influencers: [{ handle, platform, reach, engagement, alignment, reason }] }" },
+        growthPlan: { type: "object", description: "{ short_term_actions, outreach_targets, content_themes, risks }" },
+      },
+      required: ["projectId"],
+    },
+    handler: (input) => handlers.updateProject(input as Parameters<typeof handlers.updateProject>[0]),
+  },
+  {
+    name: "get_project",
+    description: "Load a project with its subject person/org. Use when resuming work on an existing campaign/brand project.",
+    input_schema: {
+      type: "object",
+      properties: { projectId: { type: "string" } },
+      required: ["projectId"],
+    },
+    handler: (input) => handlers.getProject(input as Parameters<typeof handlers.getProject>[0]),
+  },
+  {
+    name: "list_projects",
+    description: "List projects, optionally filtered by status.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: { type: "string" },
+        limit: { type: "number" },
+      },
+    },
+    handler: (input) => handlers.listProjects(input as Parameters<typeof handlers.listProjects>[0]),
+  },
 ];
 
 export function findTool(name: string): BrainTool | undefined {

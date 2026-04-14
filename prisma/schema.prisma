@@ -42,6 +42,8 @@ model Person {
   ownerships     Ownership[]      @relation("personOwnership")
   courtParties   CourtCaseParty[]
   claims         Claim[]          @relation("personClaims")
+  caseEvidence   CaseEvidence[]
+  projectSubject Project[]        @relation("projectSubjectPerson")
 
   @@index([familyName, givenName])
 }
@@ -65,6 +67,8 @@ model Organization {
   vendorPayments    VendorPayment[]
   ownerships        Ownership[]     @relation("orgOwnership")
   claims            Claim[]         @relation("orgClaims")
+  caseEvidence      CaseEvidence[]
+  projectSubject    Project[]       @relation("projectSubjectOrg")
 
   @@index([name])
 }
@@ -254,6 +258,7 @@ model Document {
   ownerships     Ownership[]     @relation("ownershipDoc")
   courtCases     CourtCase[]     @relation("caseDoc")
   claims         Claim[]         @relation("claimDoc")
+  caseEvidence   CaseEvidence[]
 
   @@index([sourceSystem])
   @@index([publishedAt])
@@ -290,10 +295,77 @@ model Claim {
   charStart        Int?
   charEnd          Int?
   collectedAt      DateTime      @default(now())
+  caseEvidence     CaseEvidence[]
 
   @@index([subjectPersonId, predicate])
   @@index([subjectOrgId, predicate])
   @@index([sourceDocumentId])
+}
+
+// -- Cases (investigations) and Projects (campaigns/brands) -----------------
+//
+// Cases and Projects are the two main containers for Dark Horse work.
+// Everything the agent produces attaches to one of them via CaseEvidence /
+// ProjectAsset join rows. Research-mode conversations can also persist to
+// a Case or Project after the fact.
+
+model Case {
+  id          String   @id @default(cuid())
+  title       String
+  brief       String   @db.Text // what are we investigating and why
+  status      String   @default("active") // active | paused | closed | published
+  findings    Json?    // structured findings produced by the brain
+  outputDraft String?  @db.Text // journalism piece draft in user's voice
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  evidence CaseEvidence[]
+
+  @@index([status, updatedAt])
+}
+
+model CaseEvidence {
+  id               String        @id @default(cuid())
+  caseId           String
+  case             Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  role             String        @default("supporting") // primary_source | supporting | contradicting | background
+  documentId       String?
+  document         Document?     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  claimId          String?
+  claim            Claim?        @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  personId         String?
+  person           Person?       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  note             String?       @db.Text
+  addedAt          DateTime      @default(now())
+
+  @@index([caseId])
+  @@index([documentId])
+  @@index([claimId])
+  @@index([personId])
+  @@index([organizationId])
+}
+
+model Project {
+  id              String        @id @default(cuid())
+  title           String
+  kind            String        @default("campaign") // campaign | brand | other
+  subjectPersonId String?
+  subjectPerson   Person?       @relation("projectSubjectPerson", fields: [subjectPersonId], references: [id])
+  subjectOrgId    String?
+  subjectOrg      Organization? @relation("projectSubjectOrg", fields: [subjectOrgId], references: [id])
+  goals           Json?         // agent-structured goals list
+  brandAnalysis   Json?         // current perception, coverage, social presence
+  influencerMap   Json?         // ranked influencer list + alignment scores
+  growthPlan      Json?         // recommended actions, outreach targets
+  status          String        @default("active") // active | paused | closed
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([subjectPersonId])
+  @@index([subjectOrgId])
 }
 
 // -- Infrastructure (entity resolution, scraper observability, spend) ------
