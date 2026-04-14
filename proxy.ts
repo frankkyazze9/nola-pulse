@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken, SESSION_COOKIE } from "./lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/favicon.ico"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth/login",
+  "/api/telegram/webhook", // Telegram webhook has its own secret-token auth
+  "/favicon.ico",
+];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
