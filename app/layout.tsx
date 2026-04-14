@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import Nav from "@/components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Dark Horse",
-  description: "Internal political research tool.",
+  description: "Internal research platform.",
 };
 
 export default function RootLayout({
@@ -14,7 +15,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full flex flex-col text-base leading-relaxed">
-        <main className="flex-1">{children}</main>
+        <Nav />
+        <main className="flex-1 flex flex-col">{children}</main>
       </body>
     </html>
   );

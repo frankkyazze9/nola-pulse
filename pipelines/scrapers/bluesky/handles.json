@@ -1,0 +1,15 @@
+{
+  "_comment": "Tracked Bluesky handles for LA political figures. Placeholder seed list — real handles should replace these as they're verified. Handles may or may not resolve; the scraper tolerates 404s.",
+  "handles": [
+    "gov-landry.bsky.social",
+    "nola-mayor.bsky.social",
+    "la-attorney-general.bsky.social",
+    "la-secstate.bsky.social",
+    "la-senate.bsky.social",
+    "la-house.bsky.social",
+    "orleans-da.bsky.social",
+    "nola-council.bsky.social",
+    "la-illuminator.bsky.social",
+    "verite-news.bsky.social"
+  ]
+}
