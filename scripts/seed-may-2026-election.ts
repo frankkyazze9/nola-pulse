@@ -30,8 +30,8 @@ async function main(): Promise<void> {
     );
   }
 
-  const date = new Date("2026-05-12T00:00:00Z");
-  const ocdId = `${jurisdiction.ocdId}/election:2026-05-12`;
+  const date = new Date("2026-05-16T00:00:00Z");
+  const ocdId = `${jurisdiction.ocdId}/election:2026-05-16`;
 
   // Idempotent — upsert by OCD election ID
   const existing = await prisma.election.findUnique({ where: { ocdId } });

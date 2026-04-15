@@ -555,6 +555,20 @@ export const TOOLS: BrainTool[] = [
     },
     handler: (input) => handlers.summarizeLocationTrail(input as Parameters<typeof handlers.summarizeLocationTrail>[0]),
   },
+  {
+    name: "publish_dossier",
+    description:
+      "Publish a finished dossier to the shared Google Drive folder as a Google Doc. Use only for completed reports — investigation findings, candidate dossiers, race breakdowns. Returns the public Drive URL. The caller is responsible for verifying the markdown is publish-ready.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Dossier title — used as the Doc filename." },
+        markdown: { type: "string", description: "Full markdown body. Will be converted to a Google Doc." },
+      },
+      required: ["title", "markdown"],
+    },
+    handler: (input) => handlers.publishDossier(input as Parameters<typeof handlers.publishDossier>[0]),
+  },
 ];
 
 export function findTool(name: string): BrainTool | undefined {

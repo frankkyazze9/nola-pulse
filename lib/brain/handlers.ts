@@ -1160,3 +1160,10 @@ function computeBounds(
   }
   return { minLat, maxLat, minLng, maxLng };
 }
+
+import { publishDossier as driveDossierPublish } from "@/lib/drive";
+
+export async function publishDossier(args: { title: string; markdown: string }) {
+  const result = await driveDossierPublish(args.title, args.markdown);
+  return result;
+}
