@@ -1,125 +1,136 @@
 # Dark Horse
 
-Internal political research tool. Deep-research "brain" that reasons over a Louisiana / New Orleans political knowledge graph — campaign finance, court records, public hearings, news coverage, public opinion — and returns sourced analytical synthesis for candidates and seat-holders at every level (judges, city council, state reps, DAs, sheriffs, mayors).
+Louisiana OSINT and political-intelligence platform. An agent-driven deep-research "brain" that reasons over a Louisiana / New Orleans political knowledge graph — campaign finance, court records, ethics filings, public hearings, news coverage, social feeds — and returns sourced synthesis, risk assessments, and comedy-edged observations.
 
-**This is an internal tool.** There is no public site, no marketing page, and no anonymous access. Every page is gated behind Google IAP and restricted to a short allowlist of Dark Horse team members.
+**Live:** https://dark-horse-845570509325.us-south1.run.app
 
-Built on top of the former "Nola Pulse" civic-intelligence platform — see git history prior to the rename for the earlier product.
+Dark Horse is a closed platform. Access is password-gated and restricted to a short allowlist.
 
-## Architecture at a glance
+## Product modes
 
-- **Framework:** Next.js 16 (App Router) + React 19 + TypeScript. See `.claude/skills/next16-quirks/SKILL.md` for this repo's non-standard conventions.
-- **Database:** PostgreSQL with pgvector + FTS, managed by Prisma 7. Schema in `prisma/schema.prisma` follows a FollowTheMoney-inspired political-entity model.
-- **The Brain:** `lib/brain/*` — a single Claude Sonnet tool-use loop that interactive research and dossier generation both share. Tools expose structured queries into the knowledge graph.
-- **Document pipeline:** `lib/ingest/*` — source URL → GCS → Google Document AI OCR → chunking → Haiku contextual prefix (Batch API) → self-hosted embedding → pgvector + FTS → claim extraction.
-- **Scrapers:** `pipelines/scrapers/*` — one per source, deployed as Cloud Run Jobs on a nightly Cloud Scheduler cron. Priority 1 sources are news, public hearings, and public opinion.
-- **Entity resolution:** Splink + DuckDB in a Python Cloud Run Job. Cross-source record linkage of persons and organizations.
-- **Auth:** Google IAP in front of the Cloud Run service. No app-layer auth.
-- **Hosting:** Google Cloud Run (us-south1). Cloud SQL for Postgres. GCS for documents. Cloud Run Jobs for scrapers + entity resolution + Whisper transcription. Self-hosted embeddings via a small BGE-small Cloud Run service.
-- **Budget:** `$100/month hard ceiling`. All LLM calls route through `lib/claude/spend.ts`; month-to-date is visible at `/admin/spend`. See `.claude/skills/cost-discipline/SKILL.md`.
+| Mode | Path | What it's for |
+|---|---|---|
+| Research | `/research` | Quick agent chat. One-off questions, exploratory work. |
+| Cases | `/cases` | Long-running investigations. Evidence, risk, location trails, drafts. |
+| Projects | `/projects` | Campaign/brand monitoring. Recurring observations against a target. |
+| Elections | `/elections` | Race dashboards with candidates, seats, countdowns. |
+| Observations | `/observations` | Agent-surfaced patterns, absurdities, underreported angles. |
+| Risks | `/risks` | Active risk assessments across cases/projects/entities. |
+| Admin | `/admin/spend` | Month-to-date LLM spend against the $100 ceiling. |
+
+## Architecture
+
+- **Framework:** Next.js 16 (App Router, `proxy.ts`) + React 19 + TypeScript. See `.claude/skills/next16-quirks/SKILL.md` — this repo's conventions differ from training-data Next.js.
+- **Database:** PostgreSQL 15 + pgvector + FTS + HNSW, managed by Prisma 7. Schema in `prisma/schema.prisma` uses a FollowTheMoney-inspired entity model (Person, Organization, Jurisdiction, Post, Term, Election, Candidacy, Donation, VendorPayment, CourtCase, LocationPing, …).
+- **The Brain:** `lib/brain/*` — a single Claude Sonnet 4.6 tool-use loop with prompt caching. 35+ tools cover search, case/project management, elections, risk, voice drafting, observations, and location pings. SSE streaming for chat; synchronous for batch work.
+- **Observation engine:** `lib/observation/*` — two-stage Haiku triage + Sonnet generation scoring pattern-deviation, absurdity, hidden-obvious, and underreported-angle signals. Voice-constrained output.
+- **Voice:** `lib/voice/*` — every generated sentence is validated against 18 forbidden words + em-dash ban derived from `data/voice/`.
+- **Relevance gate:** `lib/ingest/relevance.ts` — Haiku pre-ingest classifier filters non-political content before OCR/embedding spend. Gate is bypassed for structured sources (FEC, ethics, council, court, ads, elections).
+- **Document pipeline:** `lib/ingest/document-pipeline.ts` — source URL → GCS → Document AI OCR → chunking → Haiku contextual prefix (Batch API) → BGE-small embedding → pgvector + FTS → claim extraction. Fully transactional — no orphan documents.
+- **Scrapers:** `pipelines/scrapers/*` — one directory per source. Trigger via `POST /api/jobs/scrape/[name]` with `x-cron-secret` header; Cloud Scheduler calls this on a nightly cadence.
+- **Entity resolution:** Splink + DuckDB in a Python Cloud Run Job. Cross-source record linkage.
+- **Auth:** Password + HMAC-signed session cookie (`lib/auth.ts`). 7-day expiry. No user table.
+- **Hosting:** Google Cloud Run (us-south1), Cloud SQL (`nola-pulse-db`), GCS (`dark-horse-docs`), Artifact Registry (`dark-horse-repo`). Self-hosted BGE-small-en-v1.5 embeddings on a small Cloud Run service.
+- **Budget:** **$100/month LLM hard ceiling.** Every LLM call routes through `lib/claude/spend.ts`; month-to-date at `/admin/spend`. See `.claude/skills/cost-discipline/SKILL.md`.
+
+## Scrapers
+
+| Name | Source | Notes |
+|---|---|---|
+| `nola-news-rss` | LA political news RSS | Curated LA-focused list: Illuminator, The Lens, Verite, NOLA.com, Gambit, WWNO, LA Weekly, Bayou Brief. |
+| `gdelt` | GDELT 2.0 | Rate-limited to 0.2 req/sec. LA political filter. |
+| `fec` | FEC bulk | LA federal candidates + committees. |
+| `la-ethics-bootstrap` | Louisiana Ethics Board | Initial backfill. |
+| `bluesky` | Bluesky AT Protocol | Handles tracked in `pipelines/scrapers/bluesky/handles.json`. |
+| `ballotpedia` | Ballotpedia | CloudFront blocks Cloud Run IPs — reduced reliability. |
+| `wikipedia-elections` | MediaWiki extracts API | Alternative to Ballotpedia for LA election pages. |
 
 ## Local development
 
 ```bash
-# Install dependencies
 npm install
-
-# Copy env and edit
-cp .env.example .env
-
-# Apply the schema to your local Postgres (make sure pgvector is installed)
+cp .env.example .env     # edit with local Postgres + Anthropic key
 npx prisma migrate dev
-
-# Seed jurisdictions and posts
 npx prisma db seed
-
-# Start the dev server
 npm run dev
 ```
 
 ## Deploy
 
-Cloud Build watches the `main` branch on GitHub. Pushing triggers a build of the image, a push to Artifact Registry, and a deploy to Cloud Run.
+Cloud Build watches `main` on GitHub. Pushing triggers image build → Artifact Registry → Cloud Run.
 
 ```bash
-# Manual deploy
 gcloud builds submit --config=cloudbuild.yaml --project=nola-ai-innovation
 ```
 
-## Granting access to a new team member
-
-```bash
-gcloud iap web add-iam-policy-binding \
-  --resource-type=cloud-run \
-  --service=dark-horse \
-  --region=us-south1 \
-  --member=user:<email> \
-  --role=roles/iap.httpsResourceAccessor
-```
-
-That's the entire auth model. No user table, no sign-up flow, no password reset — IAP handles it.
-
 ## Secrets
 
-Production secrets live in Google Secret Manager in the `nola-ai-innovation` GCP project (845570509325). Cloud Build injects them at deploy time via `--set-secrets` in `cloudbuild.yaml`:
+Production secrets live in Google Secret Manager (`nola-ai-innovation`, 845570509325). Injected at deploy via `cloudbuild.yaml`:
 
-- `DATABASE_URL` — Cloud SQL connection string (instance: `nola-pulse-db`, database: `nolapulse`, user: `nolapulse`)
-- `ANTHROPIC_API_KEY` — Anthropic API key
-- `CRON_SECRET` — shared secret for Cloud Scheduler calls
-- `TWITTER_API_KEY` — Twitter/X API key (legacy; migrating to SociaVault in Phase 5)
-- `TWITTER_API_SECRET` — Twitter/X API secret
-- `TWITTER_ACCESS_TOKEN` — Twitter/X access token
-- `TWITTER_ACCESS_SECRET` — Twitter/X access secret
+- `DATABASE_URL` — Cloud SQL (`nola-pulse-db` / `nolapulse` / `nolapulse`)
+- `ANTHROPIC_API_KEY` — Anthropic
+- `CRON_SECRET` — shared secret for Cloud Scheduler / manual scraper triggers
+- `AUTH_SECRET` — HMAC key for session cookies
+- `ADMIN_PASSWORD` — platform password
+- `EMBEDDING_SERVICE_URL` — BGE embedding Cloud Run URL
+- `DOCUMENT_AI_PROCESSOR_ID` — Document AI OCR processor
+- `TWITTER_API_KEY` / `TWITTER_API_SECRET` / `TWITTER_ACCESS_TOKEN` / `TWITTER_ACCESS_SECRET` — legacy; migrating to SociaVault.
 
-**Stale secrets (cleanup candidates):** `ADMIN_PASSWORD`, `AUTH_SECRET`, `NEXTAUTH_URL`, `AUTH_TRUST_HOST`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS` — left over from the Nola Pulse auth system. Safe to delete once Dark Horse is confirmed stable.
-
-IAP, Document AI, GCS, Cloud SQL, and the embedding service all use the Cloud Run service account for authentication — no API-key secrets for them.
+Document AI, GCS, Cloud SQL, and the embedding service authenticate via the Cloud Run service account.
 
 ## Project structure
 
 ```
-app/               Next.js App Router pages and API routes
-components/        Shared React components (populated in Phase 8)
-data/              Static data files (seed CSV/JSON)
-deploy/            Infrastructure setup scripts (setup.sh)
+app/                Next.js App Router pages + API routes
+  research/         Quick agent chat
+  cases/            Investigations (detail page includes map)
+  projects/         Campaign/brand monitoring
+  elections/        Race dashboards
+  observations/    Agent-surfaced insights
+  risks/            Active risk assessments
+  admin/spend/      LLM spend dashboard
+  api/              Route handlers (brain SSE, pings, jobs, auth, telegram)
+components/
+  cases/CaseMap.tsx       Leaflet map + add-point form
+  elections/              Countdown badges
+data/voice/         VOICE.md + voice-analysis.md (vendored from writing-voice)
+deploy/             Infra setup scripts
 lib/
-  brain/           The Claude tool-use loop + tool implementations
-  claude/          Batch API wrapper, prompt caching, spend logging
-  ingest/          Document pipeline
-  scraper/         Shared scraper base
-  claude.ts        Claude client wrapper
-  db.ts            Prisma client singleton
-  ftm.ts           FollowTheMoney serialization helpers
-  gcs.ts           GCS upload/download helpers
-  ocd.ts           Open Civic Data ID helpers
-  spend.ts         ApiSpendLog helper
-  wayback.ts       Wayback Machine archival helper
+  brain/            Tool-use loop, tools, handlers, SSE streaming
+  claude/           Batch API, prompt caching, spend logging
+  ingest/           Document pipeline + relevance gate
+  observation/      Two-stage observation pipeline
+  voice/            Voice prompt + validator
+  conversation/     Conversation memory
+  telegram/         Telegram Bot API client (deprioritized)
+  scraper/          Shared scraper base
+  auth.ts           Password + HMAC session
 pipelines/
-  embed/           Self-hosted BGE-small embedding service (Dockerfile.embed)
-  entity-resolution/  Splink + DuckDB Python job (Dockerfile.entity-res)
-  scrapers/        One directory per scraper (bluesky, fec, gdelt,
-                     la-ethics-bootstrap, legiscan-la, nola-council-granicus,
-                     nola-news-rss)
-prisma/            Schema, migrations, seed data
-public/            Static assets
-scripts/           CLI scripts (brain-cli)
-docs/              deploy.md, ROADMAP.md
-.claude/skills/    Project-specific Claude Code skills
-Dockerfile         Main Next.js app container
-Dockerfile.embed   Embedding service container
-Dockerfile.entity-res  Entity resolution job container
+  embed/            BGE-small embedding service
+  entity-resolution/  Splink + DuckDB Python job
+  scrapers/         One directory per source
+prisma/             Schema, migrations, seed
+scripts/            CLI (brain-cli)
+docs/
+  ROADMAP.md        Phased build plan
+  TRIAGE.md         Active bug/tech-debt log
+  DATA_GAPS.md      Outstanding manual unlocks (API keys, handles)
+  ISSUES.md         Known deficiencies
+  deploy.md         Deploy runbook
+.claude/skills/     Project-specific Claude Code skills
+proxy.ts            Next 16 proxy (route auth)
 ```
 
 ## Skills
 
-The `.claude/skills/` directory holds project-specific Claude Code skills that encode design decisions so future sessions don't rediscover them. Read the relevant skill before working in a given area:
+Read the relevant skill before working in a given area:
 
-- `next16-quirks` — non-standard Next.js 16 conventions in this repo
+- `next16-quirks` — non-standard Next.js 16 conventions
 - `brain-prompt` — the Brain's system-prompt contract and model-selection rules
-- `osint-candidate` — end-to-end workflow for adding a new political candidate
-- `add-data-source` — checklist for wiring up a new scraper
-- `ingest-document` — the document ingest pipeline
-- `cost-discipline` — $100/mo budget rules and cost levers
+- `osint-candidate` — end-to-end workflow for adding a political candidate
+- `add-data-source` — checklist for wiring a new scraper
+- `ingest-document` — document ingest pipeline
+- `cost-discipline` — $100/mo budget rules
 
 ## License
 
