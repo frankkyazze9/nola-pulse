@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCase, listRisks } from "@/lib/brain/handlers";
+import { getCase, listRisks, listLocationPings } from "@/lib/brain/handlers";
+import CaseMap from "@/components/cases/CaseMap";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +14,27 @@ export default async function CaseDetailPage({
   const c = await getCase({ caseId: id });
   if (!c) notFound();
 
-  const risks = await listRisks({
-    subjectType: "case",
-    subjectId: id,
-    status: "active",
-    limit: 20,
-  });
+  const [risks, pings] = await Promise.all([
+    listRisks({
+      subjectType: "case",
+      subjectId: id,
+      status: "active",
+      limit: 20,
+    }),
+    listLocationPings({ caseId: id }),
+  ]);
+
+  // Serialize pings for the client (Date → string)
+  const pingsForClient = pings.map((p) => ({
+    id: p.id,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    timestamp: p.timestamp.toISOString(),
+    source: p.source,
+    label: p.label,
+    note: p.note,
+    accuracyM: p.accuracyM,
+  }));
 
   const evidenceByRole = {
     primary_source: c.evidence.filter((e) => e.role === "primary_source"),
@@ -100,6 +116,10 @@ export default async function CaseDetailPage({
             ))}
           </ul>
         )}
+      </Section>
+
+      <Section title={`Location trail${pingsForClient.length > 0 ? ` (${pingsForClient.length})` : ""}`}>
+        <CaseMap caseId={id} initialPings={pingsForClient} />
       </Section>
 
       {c.findings ? (

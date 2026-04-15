@@ -1083,3 +1083,80 @@ function stripJsonAndParseArray(text: string): unknown[] {
     return [];
   }
 }
+
+// --- Location tracking handlers --------------------------------------------
+
+export async function addLocationPing(args: {
+  caseId: string;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+  source?: "manual" | "apple_findmy" | "airtag" | "gpx" | "other";
+  label?: string;
+  note?: string;
+  accuracyM?: number;
+}) {
+  return prisma.locationPing.create({
+    data: {
+      caseId: args.caseId,
+      latitude: args.latitude,
+      longitude: args.longitude,
+      timestamp: new Date(args.timestamp),
+      source: args.source ?? "manual",
+      label: args.label,
+      note: args.note,
+      accuracyM: args.accuracyM,
+    },
+  });
+}
+
+export async function listLocationPings(args: { caseId: string }) {
+  return prisma.locationPing.findMany({
+    where: { caseId: args.caseId },
+    orderBy: { timestamp: "asc" },
+  });
+}
+
+export async function summarizeLocationTrail(args: { caseId: string }) {
+  const pings = await listLocationPings({ caseId: args.caseId });
+  if (pings.length === 0) {
+    return { pings: [], summary: "No location pings recorded for this case yet." };
+  }
+
+  const summary = pings
+    .map((p, i) => {
+      const dt = p.timestamp.toISOString().replace("T", " ").slice(0, 16);
+      const label = p.label ? ` — ${p.label}` : "";
+      return `${i + 1}. [${dt}] ${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}${label}${p.note ? ` (${p.note})` : ""}`;
+    })
+    .join("\n");
+
+  const first = pings[0].timestamp;
+  const last = pings[pings.length - 1].timestamp;
+  const hours = (last.getTime() - first.getTime()) / (1000 * 60 * 60);
+  const bounds = computeBounds(pings);
+
+  return {
+    pings,
+    count: pings.length,
+    spanHours: Math.round(hours * 10) / 10,
+    bounds,
+    summary,
+  };
+}
+
+function computeBounds(
+  pings: Array<{ latitude: number; longitude: number }>
+): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+  let minLat = 90,
+    maxLat = -90,
+    minLng = 180,
+    maxLng = -180;
+  for (const p of pings) {
+    if (p.latitude < minLat) minLat = p.latitude;
+    if (p.latitude > maxLat) maxLat = p.latitude;
+    if (p.longitude < minLng) minLng = p.longitude;
+    if (p.longitude > maxLng) maxLng = p.longitude;
+  }
+  return { minLat, maxLat, minLng, maxLng };
+}

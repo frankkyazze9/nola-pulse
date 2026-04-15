@@ -324,9 +324,26 @@ model Case {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  evidence CaseEvidence[]
+  evidence      CaseEvidence[]
+  locationPings LocationPing[]
 
   @@index([status, updatedAt])
+}
+
+model LocationPing {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  latitude  Float
+  longitude Float
+  timestamp DateTime
+  source    String   @default("manual") // manual | apple_findmy | airtag | gpx | other
+  label     String? // e.g. "Home", "Transfer station", "Landfill"
+  note      String?  @db.Text
+  accuracyM Float? // accuracy in meters if known
+  createdAt DateTime @default(now())
+
+  @@index([caseId, timestamp])
 }
 
 model CaseEvidence {

@@ -513,6 +513,48 @@ export const TOOLS: BrainTool[] = [
     },
     handler: (input) => handlers.getRisk(input as Parameters<typeof handlers.getRisk>[0]),
   },
+
+  // --- Location tracking tools ---
+  {
+    name: "add_location_ping",
+    description:
+      "Record a location point on a case. Used for investigations with a geographic/physical element -- e.g. tracking an AirTag through a recycling route, mapping a subject's movements, documenting site visits. Pass lat/lng, a timestamp, optional source (manual|apple_findmy|airtag|gpx|other), label (e.g. 'Transfer station'), note, and accuracy (meters).",
+    input_schema: {
+      type: "object",
+      properties: {
+        caseId: { type: "string" },
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+        timestamp: { type: "string", description: "ISO timestamp" },
+        source: { type: "string", enum: ["manual", "apple_findmy", "airtag", "gpx", "other"] },
+        label: { type: "string" },
+        note: { type: "string" },
+        accuracyM: { type: "number" },
+      },
+      required: ["caseId", "latitude", "longitude", "timestamp"],
+    },
+    handler: (input) => handlers.addLocationPing(input as Parameters<typeof handlers.addLocationPing>[0]),
+  },
+  {
+    name: "list_location_pings",
+    description: "List all location pings for a case in chronological order.",
+    input_schema: {
+      type: "object",
+      properties: { caseId: { type: "string" } },
+      required: ["caseId"],
+    },
+    handler: (input) => handlers.listLocationPings(input as Parameters<typeof handlers.listLocationPings>[0]),
+  },
+  {
+    name: "summarize_location_trail",
+    description: "Summarize a case's location trail: count, time span, bounding box, formatted point list. Use this to narrate a journey (e.g. 'the AirTag went from X to Y over Z hours').",
+    input_schema: {
+      type: "object",
+      properties: { caseId: { type: "string" } },
+      required: ["caseId"],
+    },
+    handler: (input) => handlers.summarizeLocationTrail(input as Parameters<typeof handlers.summarizeLocationTrail>[0]),
+  },
 ];
 
 export function findTool(name: string): BrainTool | undefined {
