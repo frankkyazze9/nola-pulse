@@ -247,27 +247,27 @@ interface ScraperRow {
 async function latestRunPerScraper(): Promise<ScraperRow[]> {
   const rows = await prisma.$queryRaw<
     Array<{
-      scraper_name: string;
-      started_at: Date;
+      scraperName: string;
+      startedAt: Date;
       status: string;
-      records_fetched: number;
-      records_upserted: number;
-      error_count: number;
+      recordsFetched: number;
+      recordsUpserted: number;
+      errorCount: number;
     }>
   >`
-    SELECT DISTINCT ON (scraper_name)
-      scraper_name, started_at, status,
-      records_fetched, records_upserted, error_count
+    SELECT DISTINCT ON ("scraperName")
+      "scraperName", "startedAt", status,
+      "recordsFetched", "recordsUpserted", "errorCount"
     FROM "ScraperRun"
-    ORDER BY scraper_name, started_at DESC
+    ORDER BY "scraperName", "startedAt" DESC
   `;
   return rows.map((r) => ({
-    scraperName: r.scraper_name,
-    startedAt: r.started_at,
+    scraperName: r.scraperName,
+    startedAt: r.startedAt,
     status: r.status,
-    recordsFetched: Number(r.records_fetched),
-    recordsUpserted: Number(r.records_upserted),
-    errorCount: Number(r.error_count),
+    recordsFetched: Number(r.recordsFetched),
+    recordsUpserted: Number(r.recordsUpserted),
+    errorCount: Number(r.errorCount),
   }));
 }
 
@@ -285,23 +285,23 @@ async function docsPerSource(): Promise<
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const rows = await prisma.$queryRaw<
     Array<{
-      source_system: string;
+      sourceSystem: string;
       total: bigint;
       last7d: bigint;
       latest: Date | null;
     }>
   >`
     SELECT
-      "sourceSystem" AS source_system,
+      "sourceSystem",
       COUNT(*)::bigint AS total,
-      COUNT(*) FILTER (WHERE "collectedAt" >= ${sevenDaysAgo})::bigint AS last7d,
+      COUNT(*) FILTER (WHERE "collectedAt" >= ${sevenDaysAgo})::bigint AS "last7d",
       MAX("collectedAt") AS latest
     FROM "Document"
     GROUP BY "sourceSystem"
     ORDER BY total DESC
   `;
   return rows.map((r) => ({
-    sourceSystem: r.source_system,
+    sourceSystem: r.sourceSystem,
     total: Number(r.total),
     last7d: Number(r.last7d),
     latest: r.latest,
