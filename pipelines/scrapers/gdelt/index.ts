@@ -121,7 +121,17 @@ function parseGdeltDate(s: string): Date | undefined {
   const hour = Number(s.slice(8, 10));
   const minute = Number(s.slice(10, 12));
   const second = Number(s.slice(12, 14));
-  return new Date(Date.UTC(year, month, day, hour, minute, second));
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    year < 1900 ||
+    year > 2200
+  ) {
+    return undefined;
+  }
+  const d = new Date(Date.UTC(year, month, day, hour, minute, second));
+  return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
