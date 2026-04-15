@@ -11,6 +11,12 @@
 import { retry, runScraper, type ScraperDefinition } from "@/lib/scraper/base";
 import { ingestDocument } from "@/lib/ingest/document-pipeline";
 
+// Curated to political / policy / investigative outlets. The previous list
+// included local TV stations (WDSU, WWL-TV, Fox 8) which flooded the corpus
+// with weather, sports, and non-policy crime — useful to drop before the
+// Haiku relevance filter even runs. WWNO stays because NPR affiliates lean
+// civic/policy. NOLA.com and Gambit stay but have the broadest surface; the
+// relevance filter will still prune their non-political coverage.
 export const FEEDS: Array<{ sourceSystem: string; url: string; label: string }> = [
   {
     sourceSystem: "louisiana_illuminator",
@@ -40,27 +46,17 @@ export const FEEDS: Array<{ sourceSystem: string; url: string; label: string }> 
   {
     sourceSystem: "wwno",
     url: "https://www.wwno.org/rss/news",
-    label: "WWNO",
-  },
-  {
-    sourceSystem: "wdsu",
-    url: "https://www.wdsu.com/topstories-rss",
-    label: "WDSU",
-  },
-  {
-    sourceSystem: "wwltv",
-    url: "https://www.wwltv.com/feeds/syndication/rss/news/local",
-    label: "WWL-TV",
-  },
-  {
-    sourceSystem: "fox8live",
-    url: "https://www.fox8live.com/arc/outboundfeeds/rss/?outputType=xml",
-    label: "Fox 8",
+    label: "WWNO (NPR / New Orleans)",
   },
   {
     sourceSystem: "louisiana_weekly",
     url: "https://www.louisianaweekly.com/feed/",
     label: "Louisiana Weekly",
+  },
+  {
+    sourceSystem: "bayoubrief",
+    url: "https://www.bayoubrief.com/feed",
+    label: "Bayou Brief",
   },
 ];
 

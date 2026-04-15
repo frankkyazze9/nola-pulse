@@ -286,7 +286,7 @@ async function ingestOpinion(params: {
         caseName: result.caseName ?? result.caseNameFull,
         dateFiled: result.dateFiled,
         personId,
-        documentId: docResult.documentId,
+        documentId: docResult.documentId ?? undefined,
       });
     }
   }
@@ -332,7 +332,7 @@ async function ingestDocket(params: {
     });
 
     if (!docResult.skipped) ctx.stats.recordsUpserted++;
-    documentId = docResult.documentId;
+    documentId = docResult.documentId ?? undefined;
   }
 
   await upsertCourtCaseAndParty({

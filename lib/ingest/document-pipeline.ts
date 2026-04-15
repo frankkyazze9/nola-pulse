@@ -26,6 +26,27 @@ import { chunkText } from "./chunk";
 import { generateContextualPrefixes } from "./contextual-prefix";
 import { embedBatch, toVectorLiteral } from "./embed";
 import { extractClaims } from "./claim-extract";
+import { classifyRelevance } from "./relevance";
+
+/** Below this, we skip chunk/embed/claim and return {skipped:true,reason:"irrelevant"}. */
+const RELEVANCE_THRESHOLD = 0.5;
+
+/**
+ * Source systems that are ALWAYS relevant — they're already political by
+ * construction, don't pay for a classification pass. Add new ones as we wire
+ * scrapers that are inherently on-topic.
+ */
+const BYPASS_RELEVANCE = new Set([
+  "fec",
+  "la_ethics",
+  "la_ethics_bootstrap",
+  "legiscan",
+  "nola_council",
+  "courtlistener",
+  "fb_ads",
+  "ballotpedia",
+  "wikipedia_elections",
+]);
 
 export interface IngestInput {
   sourceUrl: string;
@@ -45,13 +66,18 @@ export interface IngestInput {
   /** Plain text payload for articles / social posts. */
   textContent?: string;
   metadata?: Record<string, unknown>;
+  /** Override relevance filtering (default false — relevance IS checked). */
+  skipRelevanceCheck?: boolean;
 }
 
 export interface IngestResult {
-  documentId: string;
+  documentId: string | null; // null when rejected by relevance filter
   skipped: boolean;
   chunkCount: number;
   claimCount: number;
+  /** "dedupe" | "too_short" | "irrelevant" | "ingested" */
+  reason?: string;
+  relevanceScore?: number;
 }
 
 export async function ingestDocument(input: IngestInput): Promise<IngestResult> {
@@ -64,7 +90,46 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
     select: { id: true },
   });
   if (existing) {
-    return { documentId: existing.id, skipped: true, chunkCount: 0, claimCount: 0 };
+    return {
+      documentId: existing.id,
+      skipped: true,
+      chunkCount: 0,
+      claimCount: 0,
+      reason: "dedupe",
+    };
+  }
+
+  // 1.5. Relevance gate. Skip cheap-to-classify docs that aren't political
+  // or policy-related. Source systems in BYPASS_RELEVANCE are always kept.
+  if (
+    !input.skipRelevanceCheck &&
+    !BYPASS_RELEVANCE.has(input.sourceSystem) &&
+    input.textContent &&
+    input.textContent.length > 200
+  ) {
+    try {
+      const rel = await classifyRelevance(
+        input.title ?? "",
+        input.textContent.slice(0, 1500)
+      );
+      if (rel.score < RELEVANCE_THRESHOLD) {
+        return {
+          documentId: null,
+          skipped: true,
+          chunkCount: 0,
+          claimCount: 0,
+          reason: "irrelevant",
+          relevanceScore: rel.score,
+        };
+      }
+    } catch (err) {
+      // On classifier failure, err on the side of ingesting — we don't want
+      // to silently drop real content because Haiku hiccupped.
+      console.warn(
+        "[ingest] relevance classifier failed, defaulting to ingest:",
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 
   // 2. Wayback (best effort; non-blocking)
