@@ -37,7 +37,9 @@ const DEFAULT_QUERY =
 export const gdelt: ScraperDefinition<GdeltArgs> = {
   name: "scraper-gdelt",
   sourceSystem: "gdelt",
-  rateLimitPerSec: 1,
+  // GDELT explicitly asks for no more than 1 request per 5 seconds.
+  // 0.2 req/sec = 5s between calls.
+  rateLimitPerSec: 0.2,
   async run(args, ctx) {
     const query = args.query ?? DEFAULT_QUERY;
     const hours = args.hours ?? 24;
