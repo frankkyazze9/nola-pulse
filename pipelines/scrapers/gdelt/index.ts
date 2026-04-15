@@ -8,7 +8,7 @@
  * Docs: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
  */
 
-import { retry, runScraper, type ScraperDefinition } from "@/lib/scraper/base";
+import { runScraper, type ScraperDefinition } from "@/lib/scraper/base";
 import { ingestDocument } from "@/lib/ingest/document-pipeline";
 
 const GDELT_DOC_URL = "https://api.gdeltproject.org/api/v2/doc/doc";
@@ -54,13 +54,10 @@ export const gdelt: ScraperDefinition<GdeltArgs> = {
     url.searchParams.set("maxrecords", String(maxRecords));
     url.searchParams.set("sort", "DateDesc");
 
-    const data = await retry(async () => {
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        throw new Error(`GDELT ${response.status}: ${await response.text().catch(() => "")}`);
-      }
-      return response.json() as Promise<{ articles?: GdeltArticle[] }>;
-    });
+    // GDELT enforces 1-req-per-5-sec globally per client. A fast retry on 429
+    // digs us deeper — wait 15s and try once more, then give up (cron fires
+    // again next hour).
+    const data = await fetchGdelt(url.toString());
 
     const articles = data.articles ?? [];
     ctx.stats.recordsFetched += articles.length;
@@ -93,6 +90,23 @@ export const gdelt: ScraperDefinition<GdeltArgs> = {
     }
   },
 };
+
+async function fetchGdelt(url: string): Promise<{ articles?: GdeltArticle[] }> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await fetch(url);
+    if (response.ok) {
+      return response.json() as Promise<{ articles?: GdeltArticle[] }>;
+    }
+    const body = await response.text().catch(() => "");
+    if (response.status === 429 && attempt === 0) {
+      // Honour the published rate limit — wait well past 5s before retrying.
+      await new Promise((r) => setTimeout(r, 15_000));
+      continue;
+    }
+    throw new Error(`GDELT ${response.status}: ${body}`);
+  }
+  throw new Error("GDELT: unreachable");
+}
 
 async function fetchArticleBody(url: string): Promise<string | null> {
   try {

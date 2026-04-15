@@ -117,7 +117,7 @@ export async function runObservationPass(
           "bluesky",
           "fb_ads",
           "courtlistener",
-          "ballotpedia",
+          "wikipedia_elections",
         ],
       },
     },

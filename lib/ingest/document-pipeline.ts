@@ -29,7 +29,7 @@ import { extractClaims } from "./claim-extract";
 import { classifyRelevance } from "./relevance";
 
 /** Below this, we skip chunk/embed/claim and return {skipped:true,reason:"irrelevant"}. */
-const RELEVANCE_THRESHOLD = 0.5;
+const RELEVANCE_THRESHOLD = 0.35;
 
 /**
  * Source systems that are ALWAYS relevant — they're already political by
@@ -46,6 +46,15 @@ const BYPASS_RELEVANCE = new Set([
   "fb_ads",
   "ballotpedia",
   "wikipedia_elections",
+  // Curated LA-political RSS outlets — hand-picked in pipelines/scrapers/nola-news-rss
+  "louisiana_illuminator",
+  "the_lens_nola",
+  "verite_news",
+  "nola_com",
+  "gambit",
+  "wwno",
+  "louisiana_weekly",
+  "bayoubrief",
 ]);
 
 export interface IngestInput {

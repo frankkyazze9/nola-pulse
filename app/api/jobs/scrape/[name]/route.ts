@@ -15,7 +15,6 @@ import { gdelt } from "@/pipelines/scrapers/gdelt/index";
 import { fec } from "@/pipelines/scrapers/fec/index";
 import { laEthicsBootstrap } from "@/pipelines/scrapers/la-ethics-bootstrap/index";
 import { bluesky } from "@/pipelines/scrapers/bluesky/index";
-import { ballotpedia } from "@/pipelines/scrapers/ballotpedia/index";
 import { wikipediaElections } from "@/pipelines/scrapers/wikipedia-elections/index";
 import type { NextRequest } from "next/server";
 
@@ -29,7 +28,6 @@ const SCRAPERS = {
   fec,
   "la-ethics-bootstrap": laEthicsBootstrap,
   bluesky,
-  ballotpedia,
   "wikipedia-elections": wikipediaElections,
 } as const;
 
