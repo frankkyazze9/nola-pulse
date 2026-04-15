@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCase } from "@/lib/brain/handlers";
+import { getCase, listRisks } from "@/lib/brain/handlers";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,13 @@ export default async function CaseDetailPage({
   const { id } = await params;
   const c = await getCase({ caseId: id });
   if (!c) notFound();
+
+  const risks = await listRisks({
+    subjectType: "case",
+    subjectId: id,
+    status: "active",
+    limit: 20,
+  });
 
   const evidenceByRole = {
     primary_source: c.evidence.filter((e) => e.role === "primary_source"),
@@ -51,6 +58,48 @@ export default async function CaseDetailPage({
 
       <Section title="Brief">
         <p className="text-sm whitespace-pre-wrap">{c.brief}</p>
+      </Section>
+
+      <Section title={`Risk (${risks.length})`}>
+        {risks.length === 0 ? (
+          <p className="text-sm text-muted italic">
+            No risk assessments yet. Ask the agent: &ldquo;assess risk on this case&rdquo;.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {risks.map((r) => (
+              <li
+                key={r.id}
+                className="px-3 py-2 border border-card-border rounded bg-background text-sm"
+              >
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span
+                    className={`px-2 py-0.5 text-xs rounded font-semibold uppercase ${
+                      r.severity === "critical"
+                        ? "bg-danger text-white"
+                        : r.severity === "high"
+                        ? "bg-danger/20 text-danger"
+                        : r.severity === "medium"
+                        ? "bg-warning/20 text-warning"
+                        : "bg-muted/20 text-muted"
+                    }`}
+                  >
+                    {r.severity}
+                  </span>
+                  <span className="text-xs uppercase tracking-wider text-muted">
+                    {r.riskType.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <p className="font-medium">{r.summary}</p>
+                {r.description && (
+                  <p className="text-muted mt-1 whitespace-pre-wrap">
+                    {r.description}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
 
       {c.findings ? (

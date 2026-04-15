@@ -768,3 +768,318 @@ export async function updateObservationStatus(args: {
     },
   });
 }
+
+// --- Risk assessment handlers ----------------------------------------------
+
+const RISK_SYSTEM = `You are a risk analyst for Dark Horse, a Louisiana political OSINT platform.
+
+Your job: given a subject (person, organization, case, or project) and relevant context, produce structured risk assessments by category.
+
+Risk categories:
+- legal: criminal, civil, regulatory, ethics board, tax exposure
+- financial: funding collapse, donor concentration, debt, spending patterns
+- reputational: scandal surface, media narrative momentum, past controversies
+- opposition: known enemies, challengers, organized opposition groups
+- narrative: narrative control, frame-vulnerability, selective-story risk
+- operational: staff turnover, capacity issues, vendor dependence
+- other: anything meaningful that doesn't fit
+
+For CASES (investigations), add category hints:
+- publication_risk: legal liability, source exposure, narrative backlash if published
+- backlash_risk: who gains power by opposing this piece, what organized response is likely
+- who_benefits: parties who gain if the investigation's hypothesis is true
+- who_loses: parties who lose if confirmed
+
+Severity scale:
+- critical: imminent, high-impact, requires intervention
+- high: likely to materialize, meaningful impact
+- medium: possible, watch-worthy
+- low: noted but not pressing
+
+Output rules:
+- Short summary (one sentence). Description can expand with 2-4 sentences.
+- Confidence 0.0-1.0 reflects how well the evidence supports the assessment.
+- Cite sources by quoting 5-15 word phrases from the provided context chunks.
+- Only assess categories the evidence supports. Don't invent risks to fill slots.
+- Return STRICT JSON array of assessments.
+
+Output shape:
+[
+  {
+    "riskType": "legal" | "financial" | ...,
+    "severity": "low" | "medium" | "high" | "critical",
+    "summary": "...",
+    "description": "...",
+    "confidence": 0.0..1.0,
+    "signals": { "...": "..." },
+    "mitigations": { "...": "..." },
+    "quotes": ["...", "..."]
+  }
+]`;
+
+export async function assessRisk(args: {
+  subjectType: "person" | "organization" | "case" | "project";
+  subjectId: string;
+  categoryHints?: string[];
+  extraContext?: string;
+}): Promise<{ assessmentIds: string[]; count: number }> {
+  // Build context: pull the subject entity + related evidence
+  const context = await buildRiskContext(args.subjectType, args.subjectId);
+  if (!context) {
+    throw new Error(`subject not found: ${args.subjectType}:${args.subjectId}`);
+  }
+
+  const prompt =
+    `Subject type: ${args.subjectType}\nSubject: ${context.subjectDescription}\n\n` +
+    (args.categoryHints?.length ? `Focus categories: ${args.categoryHints.join(", ")}\n\n` : "") +
+    (args.extraContext ? `Additional context:\n${args.extraContext}\n\n` : "") +
+    `Evidence:\n${context.evidenceText}\n\nProduce risk assessments per the rules. Return [] if no risks are evident from the evidence.`;
+
+  const response = await callClaude({
+    operation: "risk_assess",
+    params: {
+      model: SONNET_MODEL,
+      max_tokens: 3000,
+      temperature: 0.3,
+      system: [{ type: "text", text: RISK_SYSTEM, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: prompt }],
+    },
+    metadata: { subjectType: args.subjectType, subjectId: args.subjectId },
+  });
+
+  const text = response.content
+    .flatMap((b) => (b.type === "text" ? [b.text] : []))
+    .join("\n");
+  const parsed = stripJsonAndParseArray(text);
+
+  const assessmentIds: string[] = [];
+  for (const raw of parsed) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const r = raw as Record<string, unknown>;
+    const riskType = String(r.riskType ?? "other");
+    const severity = String(r.severity ?? "low");
+    const summary = String(r.summary ?? "").trim();
+    if (!summary) continue;
+
+    const quotes = Array.isArray(r.quotes) ? (r.quotes as unknown[]).map(String) : [];
+
+    const created = await prisma.riskAssessment.create({
+      data: {
+        subjectType: args.subjectType,
+        subjectId: args.subjectId,
+        riskType,
+        severity,
+        summary,
+        description: r.description ? String(r.description) : null,
+        signals: r.signals as object | undefined,
+        mitigations: r.mitigations as object | undefined,
+        confidence:
+          typeof r.confidence === "number"
+            ? r.confidence
+            : parseFloat(String(r.confidence ?? 0.6)) || 0.6,
+        status: "active",
+        sources: {
+          create: quotes.slice(0, 5).map((q) => ({
+            documentId: context.primaryDocumentId,
+            quote: q,
+          })).filter((s) => s.documentId !== null) as Array<{ documentId: string; quote: string }>,
+        },
+      },
+      select: { id: true },
+    });
+    assessmentIds.push(created.id);
+  }
+
+  return { assessmentIds, count: assessmentIds.length };
+}
+
+interface RiskContext {
+  subjectDescription: string;
+  evidenceText: string;
+  primaryDocumentId: string | null;
+}
+
+async function buildRiskContext(
+  subjectType: string,
+  subjectId: string
+): Promise<RiskContext | null> {
+  if (subjectType === "person") {
+    const p = await prisma.person.findUnique({
+      where: { id: subjectId },
+      include: {
+        terms: { include: { post: true } },
+        claims: {
+          take: 20,
+          orderBy: { collectedAt: "desc" },
+          include: {
+            sourceDocument: {
+              select: { id: true, title: true, sourceSystem: true },
+            },
+          },
+        },
+        donationsGiven: { take: 5, orderBy: { date: "desc" } },
+      },
+    });
+    if (!p) return null;
+    const claimsText = p.claims
+      .map(
+        (c) =>
+          `- ${c.predicate}: ${c.objectText} (${(c.confidence * 100).toFixed(0)}%) [${c.sourceDocument?.title ?? "source"}]`
+      )
+      .join("\n");
+    const firstDoc = p.claims[0]?.sourceDocument?.id ?? null;
+    return {
+      subjectDescription: `${p.givenName} ${p.familyName}${p.party ? ` (${p.party})` : ""}`,
+      evidenceText: claimsText || "(no claims yet)",
+      primaryDocumentId: firstDoc,
+    };
+  }
+
+  if (subjectType === "organization") {
+    const o = await prisma.organization.findUnique({
+      where: { id: subjectId },
+      include: {
+        claims: {
+          take: 20,
+          orderBy: { collectedAt: "desc" },
+          include: {
+            sourceDocument: {
+              select: { id: true, title: true, sourceSystem: true },
+            },
+          },
+        },
+      },
+    });
+    if (!o) return null;
+    const claimsText = o.claims
+      .map(
+        (c) =>
+          `- ${c.predicate}: ${c.objectText} [${c.sourceDocument?.title ?? "source"}]`
+      )
+      .join("\n");
+    return {
+      subjectDescription: `${o.name} (${o.orgType})`,
+      evidenceText: claimsText || "(no claims yet)",
+      primaryDocumentId: o.claims[0]?.sourceDocument?.id ?? null,
+    };
+  }
+
+  if (subjectType === "case") {
+    const c = await prisma.case.findUnique({
+      where: { id: subjectId },
+      include: {
+        evidence: {
+          take: 15,
+          include: {
+            document: { select: { id: true, title: true, sourceSystem: true, textContent: true } },
+            claim: {
+              select: { predicate: true, objectText: true, confidence: true },
+            },
+          },
+        },
+      },
+    });
+    if (!c) return null;
+    const evidenceText = c.evidence
+      .map((e) => {
+        if (e.document) {
+          const snippet = e.document.textContent?.slice(0, 400) ?? "";
+          return `[${e.role}] Doc: ${e.document.title ?? e.document.sourceSystem} — ${snippet}`;
+        }
+        if (e.claim) {
+          return `[${e.role}] Claim: ${e.claim.predicate} — ${e.claim.objectText}`;
+        }
+        return `[${e.role}] evidence`;
+      })
+      .join("\n---\n");
+    return {
+      subjectDescription: `Case "${c.title}" (status: ${c.status})\nBrief: ${c.brief}`,
+      evidenceText: evidenceText || "(no evidence attached yet)",
+      primaryDocumentId: c.evidence.find((e) => e.documentId)?.documentId ?? null,
+    };
+  }
+
+  if (subjectType === "project") {
+    const p = await prisma.project.findUnique({
+      where: { id: subjectId },
+      include: {
+        subjectPerson: true,
+        subjectOrg: true,
+      },
+    });
+    if (!p) return null;
+    const subjDesc = p.subjectPerson
+      ? `${p.subjectPerson.givenName} ${p.subjectPerson.familyName}`
+      : p.subjectOrg
+      ? p.subjectOrg.name
+      : "(no subject linked)";
+    return {
+      subjectDescription: `Project "${p.title}" (${p.kind}) — subject: ${subjDesc}`,
+      evidenceText: p.goals ? JSON.stringify(p.goals) : "(no goals defined)",
+      primaryDocumentId: null,
+    };
+  }
+
+  return null;
+}
+
+export async function listRisks(args: {
+  subjectType?: string;
+  subjectId?: string;
+  severity?: string;
+  status?: string;
+  limit?: number;
+}) {
+  return prisma.riskAssessment.findMany({
+    where: {
+      ...(args.subjectType ? { subjectType: args.subjectType } : {}),
+      ...(args.subjectId ? { subjectId: args.subjectId } : {}),
+      ...(args.severity ? { severity: args.severity } : {}),
+      ...(args.status ? { status: args.status } : {}),
+    },
+    orderBy: [{ severity: "asc" }, { updatedAt: "desc" }],
+    take: args.limit ?? 50,
+    include: {
+      sources: {
+        include: {
+          document: { select: { title: true, sourceUrl: true, sourceSystem: true } },
+        },
+      },
+    },
+  });
+}
+
+export async function getRisk(args: { riskId: string }) {
+  return prisma.riskAssessment.findUnique({
+    where: { id: args.riskId },
+    include: {
+      sources: {
+        include: {
+          document: true,
+          claim: true,
+        },
+      },
+    },
+  });
+}
+
+function stripJsonAndParseArray(text: string): unknown[] {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const body = fenced ? fenced[1] : text;
+  try {
+    const parsed = JSON.parse(body);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    const first = body.indexOf("[");
+    const last = body.lastIndexOf("]");
+    if (first >= 0 && last > first) {
+      try {
+        const parsed = JSON.parse(body.slice(first, last + 1));
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+}

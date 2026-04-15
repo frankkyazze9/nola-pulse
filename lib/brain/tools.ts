@@ -466,6 +466,53 @@ export const TOOLS: BrainTool[] = [
     },
     handler: (input) => handlers.updateObservationStatus(input as Parameters<typeof handlers.updateObservationStatus>[0]),
   },
+
+  // --- Risk assessment tools ---
+  {
+    name: "assess_risk",
+    description:
+      "Run a structured risk analysis on a subject (person, organization, case, or project). Uses Sonnet + the subject's existing claims/evidence/metadata to produce typed assessments by category (legal, financial, reputational, opposition, narrative, operational). For cases, also produces publication_risk / backlash_risk / who_benefits / who_loses analysis. Returns the created assessment IDs. Use when the user asks about risk, enemies, exposure, or 'who benefits from this.'\n\ncategoryHints (optional) limits the analysis to specific categories. extraContext lets you pass additional framing (e.g. 'focus on risks if we publish this piece').",
+    input_schema: {
+      type: "object",
+      properties: {
+        subjectType: { type: "string", enum: ["person", "organization", "case", "project"] },
+        subjectId: { type: "string" },
+        categoryHints: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional categories to focus on. Omit for full sweep.",
+        },
+        extraContext: { type: "string" },
+      },
+      required: ["subjectType", "subjectId"],
+    },
+    handler: (input) => handlers.assessRisk(input as Parameters<typeof handlers.assessRisk>[0]),
+  },
+  {
+    name: "list_risks",
+    description: "List risk assessments, optionally filtered by subject, severity, or status. Returns with source quotes.",
+    input_schema: {
+      type: "object",
+      properties: {
+        subjectType: { type: "string" },
+        subjectId: { type: "string" },
+        severity: { type: "string", enum: ["low", "medium", "high", "critical"] },
+        status: { type: "string", enum: ["active", "resolved", "watching", "dismissed"] },
+        limit: { type: "number" },
+      },
+    },
+    handler: (input) => handlers.listRisks(input as Parameters<typeof handlers.listRisks>[0]),
+  },
+  {
+    name: "get_risk",
+    description: "Load a single risk assessment with all sources.",
+    input_schema: {
+      type: "object",
+      properties: { riskId: { type: "string" } },
+      required: ["riskId"],
+    },
+    handler: (input) => handlers.getRisk(input as Parameters<typeof handlers.getRisk>[0]),
+  },
 ];
 
 export function findTool(name: string): BrainTool | undefined {

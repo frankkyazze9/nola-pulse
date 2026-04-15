@@ -262,6 +262,7 @@ model Document {
   claims         Claim[]         @relation("claimDoc")
   caseEvidence   CaseEvidence[]
   observationSources ObservationSource[]
+  riskSources    RiskAssessmentSource[]
 
   @@index([sourceSystem])
   @@index([publishedAt])
@@ -299,6 +300,7 @@ model Claim {
   charEnd          Int?
   collectedAt      DateTime      @default(now())
   caseEvidence     CaseEvidence[]
+  riskSources      RiskAssessmentSource[]
 
   @@index([subjectPersonId, predicate])
   @@index([subjectOrgId, predicate])
@@ -445,6 +447,53 @@ model ObservationSource {
 
   @@index([observationId])
   @@index([documentId])
+}
+
+// -- Risk assessments -------------------------------------------------------
+//
+// Risk analysis as a first-class dimension on any subject (Person,
+// Organization, Case, Project). The agent assesses risk by category
+// (legal, financial, reputational, opposition, narrative, operational)
+// and severity (low/medium/high/critical). Sources link to Documents
+// and Claims that drive the assessment.
+
+model RiskAssessment {
+  id          String   @id @default(cuid())
+  subjectType String // "person" | "organization" | "case" | "project"
+  subjectId   String
+  riskType    String // legal | financial | reputational | opposition | narrative | operational | other
+  severity    String // low | medium | high | critical
+  summary     String // one-liner
+  description String?  @db.Text
+  signals     Json? // structured signals driving the assessment
+  mitigations Json? // recommended actions / counter-measures
+  confidence  Float    @default(0.7)
+  status      String   @default("active") // active | resolved | watching | dismissed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sources RiskAssessmentSource[]
+
+  @@index([subjectType, subjectId])
+  @@index([severity, updatedAt])
+  @@index([riskType])
+  @@index([status])
+}
+
+model RiskAssessmentSource {
+  id               String         @id @default(cuid())
+  riskAssessmentId String
+  riskAssessment   RiskAssessment @relation(fields: [riskAssessmentId], references: [id], onDelete: Cascade)
+  documentId       String?
+  document         Document?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  claimId          String?
+  claim            Claim?         @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  quote            String?        @db.Text
+  note             String?
+
+  @@index([riskAssessmentId])
+  @@index([documentId])
+  @@index([claimId])
 }
 
 // -- Infrastructure (entity resolution, scraper observability, spend) ------
